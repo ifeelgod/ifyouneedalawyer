@@ -17,6 +17,8 @@ import {
   AlertTriangle
 } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const cities = await prisma.city.findMany({
     where: { county: { slug: "tarrant-county" } },

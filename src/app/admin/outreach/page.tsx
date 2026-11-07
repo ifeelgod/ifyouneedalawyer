@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { Scale, Users, TrendingUp, Mail, ExternalLink, Sparkles, CheckCircle2, ShieldCheck } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminOutreachPage() {
   const firms = await prisma.lawFirm.findMany({
     include: {
