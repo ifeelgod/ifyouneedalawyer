@@ -1,0 +1,174 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model County {
+  id           String        @id @default(cuid())
+  name         String
+  slug         String        @unique
+  isActive     Boolean       @default(false)
+  state        String        @default("TX")
+  cities       City[]
+  courthouses  Courthouse[]
+  lawFirms     LawFirm[]
+  associatedPros AssociatedPro[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model City {
+  id           String        @id @default(cuid())
+  name         String
+  slug         String        @unique
+  countyId     String
+  county       County        @relation(fields: [countyId], references: [id])
+  population   Int?
+  zipCodes     String        // Comma separated zip codes
+  lawFirms     LawFirm[]
+  associatedPros AssociatedPro[]
+  courthouses  Courthouse[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Courthouse {
+  id           String        @id @default(cuid())
+  name         String
+  slug         String        @unique
+  countyId     String
+  county       County        @relation(fields: [countyId], references: [id])
+  cityId       String?
+  city         City?         @relation(fields: [cityId], references: [id])
+  courtType    String        // "Criminal/Jail", "Family", "Probate", "Civil/JP"
+  address      String
+  phone        String
+  docketUrl    String?
+  parkingGuide String
+  survivalTips String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model PracticeArea {
+  id                  String        @id @default(cuid())
+  name                String
+  slug                String        @unique
+  description         String
+  isHighVelocity      Boolean       @default(false)
+  avgSoloFeeRange     String
+  avgBoutiqueFeeRange String
+  lawFirms            LawFirmPracticeArea[]
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+}
+
+model LawFirm {
+  id                  String        @id @default(cuid())
+  name                String
+  slug                String        @unique
+  tagline             String?
+  bio                 String
+  websiteUrl          String
+  phone               String
+  email               String?
+  address             String
+  cityId              String
+  city                City          @relation(fields: [cityId], references: [id])
+  countyId            String
+  county              County        @relation(fields: [countyId], references: [id])
+  zipCode             String
+
+  // Verification & Strict 1-5 Headcount
+  attorneyCount       Int           // 1 to 5 strictly
+  sizeTier            String        // "SOLO" or "BOUTIQUE"
+  verificationStatus  String        @default("AI_VERIFIED") // AI_VERIFIED, BAR_VERIFIED, CLAIMED_VERIFIED
+  exclusionsChecked   Boolean       @default(true) // Checked not satellite of 6+ mega-firm
+  
+  // Leadership & Bar details
+  managingPartnerName String
+  barNumber           String?
+  yearEstablished     Int?
+  partnerEmail        String?
+  partnerLinkedIn     String?
+  claimToken          String        @unique @default(cuid())
+  isClaimed           Boolean       @default(false)
+
+  // Monetization & Placement
+  tier                String        @default("FREE") // "FREE", "VERIFIED_PRO", "FEATURED_SPONSOR"
+  featuredRank        Int?          // 1, 2, 3 (for top 3 featured spots per category)
+  acceptsCoCounsel    Boolean       @default(true) // TX Rule 1.04(f) joint responsibility
+  hasFreeConsultation Boolean       @default(true)
+
+  practiceAreas       LawFirmPracticeArea[]
+  leadEvents          LeadEvent[]
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+}
+
+model LawFirmPracticeArea {
+  id              String        @id @default(cuid())
+  lawFirmId       String
+  lawFirm         LawFirm       @relation(fields: [lawFirmId], references: [id], onDelete: Cascade)
+  practiceAreaId  String
+  practiceArea    PracticeArea  @relation(fields: [practiceAreaId], references: [id], onDelete: Cascade)
+
+  @@unique([lawFirmId, practiceAreaId])
+}
+
+model AssociatedPro {
+  id                  String        @id @default(cuid())
+  businessName        String
+  slug                String        @unique
+  category            String        // "CHIROPRACTOR_MD", "BAIL_BONDS", "COUNSELOR_THERAPIST", "MEDIATOR", "PROBATE_REALTOR_CPA"
+  linkedPracticeSlug  String        // "personal-injury", "criminal-defense-dwi", "family-law", "probate-estate-planning"
+  description         String
+  websiteUrl          String
+  phone               String
+  email               String?
+  address             String
+  cityId              String
+  city                City          @relation(fields: [cityId], references: [id])
+  countyId            String
+  county              County        @relation(fields: [countyId], references: [id])
+  zipCode             String
+  
+  // Specific professional perks
+  acceptsLOP          Boolean       @default(false) // Letter of Protection (Chiros/Doctors)
+  is24Hours           Boolean       @default(false) // 24/7 (Bail Bonds)
+  licenseNumber       String?
+  
+  // Monetization
+  tier                String        @default("FREE") // "FREE", "VERIFIED_PRO", "FEATURED_SPONSOR"
+  claimToken          String        @unique @default(cuid())
+  isClaimed           Boolean       @default(false)
+
+  leadEvents          LeadEvent[]
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+}
+
+model LeadEvent {
+  id                  String        @id @default(cuid())
+  eventType           String        // "IMPRESSION", "PROFILE_VIEW", "PHONE_REVEAL", "WEBSITE_CLICK", "AVAILABILITY_INQUIRY", "TRIAGE_MATCH"
+  targetType          String        // "LAW_FIRM" or "ASSOCIATED_PRO"
+  lawFirmId           String?
+  lawFirm             LawFirm?      @relation(fields: [lawFirmId], references: [id], onDelete: SetNull)
+  associatedProId     String?
+  associatedPro       AssociatedPro? @relation(fields: [associatedProId], references: [id], onDelete: SetNull)
+  practiceAreaSlug    String?
+  citySlug            String?
+  visitorZip          String?
+  prospectName        String?
+  prospectPhone       String?
+  prospectEmail       String?
+  prospectIssueSummary String?
+  utmSource           String?       @default("ifyouneedalawyer.com")
+  utmMedium           String?       @default("directory")
+  notifiedDecisionMaker Boolean     @default(false)
+  createdAt           DateTime      @default(now())
+}

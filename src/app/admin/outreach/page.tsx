@@ -1,0 +1,181 @@
+import { prisma } from "@/lib/prisma";
+import Link from "next/link";
+import { Scale, Users, TrendingUp, Mail, ExternalLink, Sparkles, CheckCircle2, ShieldCheck } from "lucide-react";
+
+export default async function AdminOutreachPage() {
+  const firms = await prisma.lawFirm.findMany({
+    include: {
+      city: true,
+      practiceAreas: {
+        include: { practiceArea: true },
+      },
+      leadEvents: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const pros = await prisma.associatedPro.findMany({
+    include: {
+      city: true,
+      leadEvents: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const totalLeads = await prisma.leadEvent.count();
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+      {/* Admin Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-8">
+        <div>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 text-xs font-bold uppercase tracking-wider mb-2">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Monetization & Decision-Maker Command Center</span>
+          </div>
+          <h1 className="text-3xl font-extrabold text-white">
+            Tarrant County Discovery & Outreach Ledger
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Real-time attribution tracking, 1-click magic claim links, and embeddable trust badges.
+          </p>
+        </div>
+
+        <div className="flex gap-4 text-xs font-semibold">
+          <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-center">
+            <span className="text-slate-400 block">Verified Small Firms</span>
+            <strong className="text-lg font-bold text-white">{firms.length}</strong>
+          </div>
+          <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-center">
+            <span className="text-slate-400 block">Associated Pros</span>
+            <strong className="text-lg font-bold text-white">{pros.length}</strong>
+          </div>
+          <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-center">
+            <span className="text-slate-400 block">Total Inquiries / Reveals</span>
+            <strong className="text-lg font-bold text-emerald-400">{totalLeads}</strong>
+          </div>
+        </div>
+      </div>
+
+      {/* Embeddable Badge Code Generator Preview */}
+      <div className="p-6 rounded-2xl border border-amber-500/30 bg-amber-500/5 space-y-3">
+        <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+          <ShieldCheck className="w-5 h-5" />
+          <span>SEO Backlink Loop: Free Embeddable Trust Badge for 1–5 Lawyer Firms</span>
+        </div>
+        <p className="text-xs text-slate-300 leading-relaxed max-w-3xl">
+          Firms paste this HTML snippet on their website footer to earn instant local credibility. Every badge provides a permanent, contextual local backlink pointing back to <strong>IfYouNeedALawyer.com</strong>, multiplying domain authority across DFW.
+        </p>
+        <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-amber-300 overflow-x-auto">
+          {`<a href="https://ifyouneedalawyer.com/tarrant-county" target="_blank"><img src="https://ifyouneedalawyer.com/badges/verified-small-firm.svg" alt="Verified Tarrant County Small Law Firm (1-5 Lawyers)" /></a>`}
+        </div>
+      </div>
+
+      {/* Discovered Law Firms Table */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-bold text-white">Discovered 1–5 Lawyer Practices (Tarrant County)</h2>
+        <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
+          <table className="w-full text-left text-xs text-slate-300">
+            <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
+              <tr>
+                <th className="p-4">Firm Name & City</th>
+                <th className="p-4">Headcount (1-5 Cap)</th>
+                <th className="p-4">Managing Partner / Decision Maker</th>
+                <th className="p-4">Tier / Sponsorship</th>
+                <th className="p-4">Attributed Leads</th>
+                <th className="p-4 text-right">Outreach Magic Link</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/80">
+              {firms.map((f) => (
+                <tr key={f.id} className="hover:bg-slate-800/30 transition-colors">
+                  <td className="p-4">
+                    <strong className="text-white block font-semibold text-sm">{f.name}</strong>
+                    <span className="text-slate-400">{f.city.name}, TX • Bar #{f.barNumber || "N/A"}</span>
+                  </td>
+                  <td className="p-4">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 font-semibold text-amber-400">
+                      {f.attorneyCount === 1 ? "1 (Solo)" : `${f.attorneyCount} (Boutique)`}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <span className="text-slate-200 block font-medium">{f.managingPartnerName}</span>
+                    <span className="text-slate-400">{f.email || "Public Bar Registry"}</span>
+                  </td>
+                  <td className="p-4">
+                    <span className={`px-2 py-0.5 rounded font-bold ${
+                      f.tier === "FEATURED_SPONSOR"
+                        ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                        : "bg-slate-800 text-slate-400"
+                    }`}>
+                      {f.tier}
+                    </span>
+                  </td>
+                  <td className="p-4 font-bold text-emerald-400 text-sm">
+                    {f.leadEvents.length} Leads
+                  </td>
+                  <td className="p-4 text-right">
+                    <Link
+                      href={`/claim/${f.claimToken}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold"
+                    >
+                      <span>Preview Claim Portal</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Discovered Associated Pros Table */}
+      <div className="space-y-4 pt-4">
+        <h2 className="text-xl font-bold text-white">Discovered Associated Professionals</h2>
+        <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
+          <table className="w-full text-left text-xs text-slate-300">
+            <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
+              <tr>
+                <th className="p-4">Business & City</th>
+                <th className="p-4">Category</th>
+                <th className="p-4">Features</th>
+                <th className="p-4">Attributed Leads</th>
+                <th className="p-4 text-right">Outreach Magic Link</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/80">
+              {pros.map((p) => (
+                <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
+                  <td className="p-4">
+                    <strong className="text-white block font-semibold text-sm">{p.businessName}</strong>
+                    <span className="text-slate-400">{p.city.name}, TX</span>
+                  </td>
+                  <td className="p-4 font-semibold text-amber-400">
+                    {p.category}
+                  </td>
+                  <td className="p-4 space-x-2">
+                    {p.acceptsLOP && <span className="text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">LOP</span>}
+                    {p.is24Hours && <span className="text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">24/7</span>}
+                  </td>
+                  <td className="p-4 font-bold text-emerald-400 text-sm">
+                    {p.leadEvents.length} Leads
+                  </td>
+                  <td className="p-4 text-right">
+                    <Link
+                      href={`/claim/${p.claimToken}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold"
+                    >
+                      <span>Preview Claim Portal</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}

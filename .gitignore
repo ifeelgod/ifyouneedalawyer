@@ -1,0 +1,20 @@
+# Next.js
+.next/
+out/
+
+# Dependencies
+node_modules/
+
+# Environment Variables
+.env*.local
+
+# Database
+dev.db
+dev.db-journal
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
