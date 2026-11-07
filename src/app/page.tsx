@@ -20,19 +20,88 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const cities = await prisma.city.findMany({
-    where: { county: { slug: "tarrant-county" } },
-    orderBy: { population: "desc" },
-    take: 6,
-  });
+  let cities: Array<{ id: string; name: string; slug: string }> = [];
+  let practiceAreas: Array<{ id: string; name: string; slug: string; description: string }> = [];
+  let courthouses: Array<{ id: string; name: string; slug: string; courtType: string; parkingGuide: string }> = [];
+  let dbError: string | null = null;
 
-  const practiceAreas = await prisma.practiceArea.findMany({
-    where: { isHighVelocity: true },
-  });
+  try {
+    const [c, pa, ch] = await Promise.all([
+      prisma.city.findMany({
+        where: { county: { slug: "tarrant-county" } },
+        orderBy: { population: "desc" },
+        take: 6,
+      }),
+      prisma.practiceArea.findMany({
+        where: { isHighVelocity: true },
+      }),
+      prisma.courthouse.findMany({
+        take: 3,
+      }),
+    ]);
+    cities = c;
+    practiceAreas = pa;
+    courthouses = ch;
+  } catch (err: unknown) {
+    console.error("Database connection error on homepage:", err);
+    dbError = err instanceof Error ? err.message : String(err);
+  }
 
-  const courthouses = await prisma.courthouse.findMany({
-    take: 3,
-  });
+  // Fallbacks if database is pending migration or seeding
+  const fallbackPracticeAreas = [
+    {
+      id: "pa-1",
+      name: "Family Law & Custody",
+      slug: "family-law",
+      description: "Divorce, child custody, protective orders, child support modifications, and parental rights.",
+    },
+    {
+      id: "pa-2",
+      name: "Criminal Defense & DWI",
+      slug: "criminal-defense-dwi",
+      description: "DWI/DUI arrests, drug possession, misdemeanor & felony defense, bail bond hearings, and expunctions.",
+    },
+    {
+      id: "pa-3",
+      name: "Probate & Estate Planning",
+      slug: "probate-estate-planning",
+      description: "Will probate, muniment of title, small estate affidavits, trusts, guardianship, and estate administration.",
+    },
+    {
+      id: "pa-4",
+      name: "Personal Injury & Accidents",
+      slug: "personal-injury",
+      description: "Car wrecks, 18-wheeler accidents, slip and falls, and wrongful death. Contingency fee representation.",
+    },
+  ];
+
+  const displayPracticeAreas = practiceAreas.length > 0 ? practiceAreas : fallbackPracticeAreas;
+
+  const fallbackCourthouses = [
+    {
+      id: "ch-1",
+      name: "Tarrant County Family Law Center",
+      slug: "tarrant-county-family-law-center",
+      courtType: "Family",
+      parkingGuide: "Calhoun St parking garage across from the Family Law Center or metered parking along Weatherford.",
+    },
+    {
+      id: "ch-2",
+      name: "Lon Evans Corrections Center & Tarrant Jail Bond Desk",
+      slug: "lon-evans-corrections-center",
+      courtType: "Criminal/Jail",
+      parkingGuide: "Free 2-hour and metered street parking along Belknap and Weatherford. Bond desk is accessible 24/7.",
+    },
+    {
+      id: "ch-3",
+      name: "Tarrant County Probate Courts #1 & #2",
+      slug: "tarrant-county-probate-courts",
+      courtType: "Probate",
+      parkingGuide: "Historic 1895 Courthouse at 100 W Weatherford. Public parking garage is located at 101 Calhoun St.",
+    },
+  ];
+
+  const displayCourthouses = courthouses.length > 0 ? courthouses : fallbackCourthouses;
 
   return (
     <div className="space-y-24 pb-20">
@@ -41,6 +110,14 @@ export default async function HomePage() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-amber-500/10 rounded-full blur-[140px] -z-10 pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {dbError && (
+            <div className="mb-8 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between">
+              <div>
+                <strong>Notice:</strong> Cloud database schema migration pending ({dbError.slice(0, 80)}...). Site running in resilient preview mode.
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             {/* Left Hero: Direct Search & Small-Firm Positioning */}
             <div className="lg:col-span-7 space-y-6">
@@ -207,7 +284,7 @@ export default async function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {practiceAreas.map((pa) => (
+          {displayPracticeAreas.map((pa) => (
             <Link
               key={pa.id}
               href={`/tarrant-county/fort-worth/${pa.slug}`}
@@ -285,7 +362,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* 5. COURTHOUSE & JAIL PROCEDURAL PROCEDURAL HUBS */}
+      {/* 5. COURTHOUSE & JAIL PROCEDURAL HUBS */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
           <div>
@@ -299,7 +376,7 @@ export default async function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {courthouses.map((ch) => (
+          {displayCourthouses.map((ch) => (
             <Link
               key={ch.id}
               href={`/courthouses/${ch.slug}`}
