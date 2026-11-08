@@ -42,6 +42,11 @@ export default async function ClaimProfilePage({ params }: PageProps) {
   const decisionMaker = firm ? firm.managingPartnerName : "Owner / Manager";
   const city = firm ? firm.city.name : pro!.city.name;
   const leadCount = firm ? firm.leadEvents.length : pro!.leadEvents.length;
+  const userEmail = firm?.partnerEmail || firm?.email || pro?.email || "";
+
+  // Live Stripe Founders Special Checkout URLs
+  const verifiedPartnerUrl = `https://buy.stripe.com/8x29AVfDH7ZwcwP3BrfIs00?client_reference_id=${encodeURIComponent(token)}${userEmail ? `&prefilled_email=${encodeURIComponent(userEmail)}` : ""}`;
+  const top3SponsorUrl = `https://buy.stripe.com/cNidRb4Z3cfM54n1tjfIs01?client_reference_id=${encodeURIComponent(token)}${userEmail ? `&prefilled_email=${encodeURIComponent(userEmail)}` : ""}`;
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-10">
@@ -140,9 +145,14 @@ export default async function ClaimProfilePage({ params }: PageProps) {
                 <li>✓ Permanent DoFollow authority SEO backlink</li>
               </ul>
             </div>
-            <button className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-colors">
+            <a
+              href={verifiedPartnerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs text-center transition-colors block"
+            >
               Claim $50/mo Founders Partner
-            </button>
+            </a>
           </div>
 
           {/* Exclusive Top 3 Category Sponsor */}
@@ -169,9 +179,14 @@ export default async function ClaimProfilePage({ params }: PageProps) {
                 <li>✓ 100% Texas Bar Rule 5.04 &amp; 7.03 Compliant Flat Ad Fee</li>
               </ul>
             </div>
-            <button className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-all shadow-md shadow-amber-500/20">
+            <a
+              href={top3SponsorUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs text-center transition-all shadow-md shadow-amber-500/20 block"
+            >
               Lock in $150/mo Top 3 Slot
-            </button>
+            </a>
           </div>
         </div>
       </div>
