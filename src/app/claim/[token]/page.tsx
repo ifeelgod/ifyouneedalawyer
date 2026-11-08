@@ -95,52 +95,82 @@ export default async function ClaimProfilePage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Monetization Upgrade Options */}
+      {/* Monetization Upgrade Options: Founders Launch Special */}
       <div className="space-y-6 pt-4">
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+            <Sparkles className="w-5 h-5 text-amber-400" />
+            <span>Founders Launch Special Pricing — Active Through November 30</span>
+          </div>
+          <span className="text-[11px] font-semibold text-amber-300 bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/30">
+            Early Adopter Rate Locked For Life
+          </span>
+        </div>
+
         <div>
-          <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Optional Monetization Tiers</span>
+          <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Early Adopter Upgrades</span>
           <h2 className="text-2xl font-bold text-white mt-1">Upgrade Your Firm's Visibility in {city}</h2>
+          <p className="text-xs text-slate-400 mt-1">
+            Join during Round 1 (Nov) for maximum savings. Rates increase to $100 &amp; $250 in December, and full price in 2027.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Verified Boutique Partner */}
-          <div className="p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4 flex flex-col justify-between">
+          <div className="p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4 flex flex-col justify-between relative overflow-hidden">
             <div className="space-y-3">
-              <span className="text-xs font-semibold text-slate-400 uppercase">Tier 1: Verified Partner</span>
-              <div className="text-2xl font-extrabold text-white">
-                $149 <span className="text-sm font-normal text-slate-400">/ month</span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-400 uppercase">Tier 1: Verified Partner</span>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded border border-emerald-500/30">
+                  Save 66% Thru Nov
+                </span>
               </div>
-              <ul className="text-xs text-slate-300 space-y-2">
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-extrabold text-white">$50</span>
+                <span className="text-sm font-normal text-slate-400">/ month</span>
+                <span className="text-xs line-through text-slate-500 ml-1">$149/mo</span>
+              </div>
+              <p className="text-[11px] text-amber-400/90 font-medium">
+                Round 1: $50/mo thru Nov • Round 2: $100/mo in Dec • Regular: $149/mo in 2027
+              </p>
+              <ul className="text-xs text-slate-300 space-y-2 pt-2 border-t border-slate-800/80">
                 <li>✓ Priority sorting above standard free profiles</li>
                 <li>✓ Direct calendar booking integration (Calendly/Clio)</li>
-                <li>✓ Live email & SMS alerts for all prospect callbacks</li>
+                <li>✓ Live email &amp; SMS alerts for all prospect callbacks</li>
                 <li>✓ Permanent DoFollow authority SEO backlink</li>
               </ul>
             </div>
             <button className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-colors">
-              Activate Verified Partner
+              Claim $50/mo Founders Partner
             </button>
           </div>
 
           {/* Exclusive Top 3 Category Sponsor */}
-          <div className="p-6 rounded-2xl border border-amber-500/60 bg-gradient-to-b from-amber-500/10 to-slate-900 space-y-4 flex flex-col justify-between shadow-xl">
+          <div className="p-6 rounded-2xl border border-amber-500/60 bg-gradient-to-b from-amber-500/10 to-slate-900 space-y-4 flex flex-col justify-between shadow-xl relative overflow-hidden">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-amber-400 uppercase">Tier 2: Top 3 Sponsor</span>
-                <span className="text-[10px] bg-amber-500 text-slate-950 font-bold px-2 py-0.5 rounded">Capped at 3</span>
+                <span className="text-[10px] bg-amber-500 text-slate-950 font-bold px-2 py-0.5 rounded">
+                  Only 3 Available
+                </span>
               </div>
-              <div className="text-2xl font-extrabold text-white">
-                $395 <span className="text-sm font-normal text-slate-400">/ month flat</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-extrabold text-white">$150</span>
+                <span className="text-sm font-normal text-slate-400">/ month flat</span>
+                <span className="text-xs line-through text-slate-500 ml-1">$395/mo</span>
               </div>
-              <ul className="text-xs text-slate-300 space-y-2">
+              <p className="text-[11px] text-amber-400/90 font-medium">
+                Round 1: $150/mo thru Nov • Round 2: $250/mo in Dec • Regular: $395/mo in 2027
+              </p>
+              <ul className="text-xs text-slate-300 space-y-2 pt-2 border-t border-slate-800/80">
                 <li>✓ Pinned in the <strong>Top 3 Featured Slots</strong> in {city}</li>
                 <li>✓ Embedded in local Courthouse Procedural Guides</li>
                 <li>✓ Recommended in the 60-Second Legal Triage Tool</li>
-                <li>✓ 100% Texas Bar Rule 5.04 & 7.03 Compliant Flat Ad Fee</li>
+                <li>✓ 100% Texas Bar Rule 5.04 &amp; 7.03 Compliant Flat Ad Fee</li>
               </ul>
             </div>
             <button className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-all shadow-md shadow-amber-500/20">
-              Lock in 1 of 3 Featured Slots
+              Lock in $150/mo Top 3 Slot
             </button>
           </div>
         </div>
