@@ -40,6 +40,17 @@ export async function POST(request: Request) {
       claimUrl,
     });
 
+    if (result.success && !isTest) {
+      await prisma.leadEvent.create({
+        data: {
+          eventType: "OUTREACH_EMAIL_SENT",
+          targetType: "LAW_FIRM",
+          lawFirmId: firm.id,
+          citySlug: firm.city.slug,
+        },
+      });
+    }
+
     return NextResponse.json({
       success: result.success,
       recipient,

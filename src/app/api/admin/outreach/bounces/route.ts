@@ -88,6 +88,14 @@ export async function POST(request: Request) {
             if (sendRes.success) {
               sentCount++;
               item.status = `Sent successfully to ${item.newPartnerEmail}`;
+              await prisma.leadEvent.create({
+                data: {
+                  eventType: "OUTREACH_EMAIL_SENT",
+                  targetType: "LAW_FIRM",
+                  lawFirmId: firm.id,
+                  citySlug: firm.city.slug,
+                },
+              });
             } else {
               failedCount++;
               item.status = `Failed: ${sendRes.error}`;

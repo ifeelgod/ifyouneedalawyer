@@ -1,7 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { Mail, Send, CheckCircle2, AlertCircle, Loader2, Sparkles, ExternalLink, RefreshCw } from "lucide-react";
+import {
+  Mail,
+  Send,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Sparkles,
+  ExternalLink,
+  RefreshCw,
+  Copy,
+  Check,
+  MessageSquare,
+  Globe,
+  Share2,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 
 interface FirmItem {
@@ -11,9 +26,13 @@ interface FirmItem {
   managingPartnerName: string;
   email: string | null;
   partnerEmail: string | null;
+  websiteUrl: string;
+  partnerLinkedIn: string | null;
   claimToken: string;
   tier: string;
   attorneyCount: number;
+  isContacted: boolean;
+  contactHistory?: Array<{ eventType: string; createdAt: string }>;
 }
 
 interface OutreachDispatcherProps {
@@ -37,7 +56,9 @@ export default function OutreachDispatcher({ firms }: OutreachDispatcherProps) {
 
   const [batchStatus, setBatchStatus] = useState<string | null>(null);
   const [isBatchSending, setIsBatchSending] = useState(false);
-  const [sentFirmIds, setSentFirmIds] = useState<Set<string>>(new Set());
+  const [sentFirmIds, setSentFirmIds] = useState<Set<string>>(
+    new Set(firms.filter((f) => f.isContacted).map((f) => f.id))
+  );
 
   // Bounces Resolution State
   const [bounceInput, setBounceInput] = useState("");
@@ -45,6 +66,14 @@ export default function OutreachDispatcher({ firms }: OutreachDispatcherProps) {
   const [isResendingBounces, setIsResendingBounces] = useState(false);
   const [matchedBounces, setMatchedBounces] = useState<MatchedBounceItem[] | null>(null);
   const [bounceActionStatus, setBounceActionStatus] = useState<string | null>(null);
+
+  // Manual Outreach Modal State
+  const [activeModalFirm, setActiveModalFirm] = useState<FirmItem | null>(null);
+  const [activeTab, setActiveTab] = useState<"form" | "social" | "email">("form");
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [markingContacted, setMarkingContacted] = useState(false);
+
+  const siteUrl = typeof window !== "undefined" ? window.location.origin : "https://ifyouneedalawyer.com";
 
   // Handle single test send to user's email
   const handleSendTest = async (e: React.FormEvent) => {
@@ -187,6 +216,14 @@ export default function OutreachDispatcher({ firms }: OutreachDispatcherProps) {
         setBounceActionStatus(
           `Re-dispatch Complete! Successfully sent: ${data.sentCount} emails. Skipped/Failed: ${data.failedCount}.`
         );
+        // Refresh sent firms
+        if (data.matched) {
+          const newSent = new Set(sentFirmIds);
+          data.matched.forEach((m: MatchedBounceItem) => {
+            if (m.status.includes("Sent successfully")) newSent.add(m.id);
+          });
+          setSentFirmIds(newSent);
+        }
       } else {
         setBounceActionStatus(`Error: ${data.error}`);
       }
@@ -195,6 +232,44 @@ export default function OutreachDispatcher({ firms }: OutreachDispatcherProps) {
     } finally {
       setIsResendingBounces(false);
     }
+  };
+
+  // Copy to clipboard helper
+  const handleCopyText = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2500);
+  };
+
+  // Mark as manually contacted
+  const handleMarkManualContact = async (firmId: string, eventType: "MANUAL_OUTREACH_FORM" | "MANUAL_OUTREACH_SOCIAL") => {
+    setMarkingContacted(true);
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventType,
+          targetType: "LAW_FIRM",
+          targetId: firmId,
+          citySlug: activeModalFirm?.cityName.toLowerCase().replace(/\s+/g, "-"),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSentFirmIds((prev) => new Set([...prev, firmId]));
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setMarkingContacted(false);
+    }
+  };
+
+  // Clean first name
+  const getFirstName = (partnerName: string) => {
+    const clean = partnerName.replace(/,\s*(Esq|PC|JD|PLLC|LLC)\.?/gi, "").trim();
+    return clean.split(/\s+/)[0] || clean;
   };
 
   return (
@@ -367,13 +442,23 @@ export default function OutreachDispatcher({ firms }: OutreachDispatcherProps) {
         )}
       </div>
 
-      {/* Discovered Law Firms Table with Enriched Emails & Send Buttons */}
+      {/* Discovered Law Firms Table with Enriched Emails, Status & Pitch Modals */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white">Discovered 1–5 Lawyer Practices ({firms.length} Enriched)</h2>
-          <span className="text-xs text-emerald-400 font-semibold bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-            100% Emails Enriched
-          </span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-white">Discovered 1–5 Lawyer Practices ({firms.length} Enriched)</h2>
+            <p className="text-xs text-slate-400">
+              {sentFirmIds.size} of {firms.length} firms have been contacted ({firms.length - sentFirmIds.size} pending).
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-emerald-400 font-semibold bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+              {sentFirmIds.size} Dispatched
+            </span>
+            <span className="text-xs text-amber-400 font-semibold bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+              {firms.length - sentFirmIds.size} Pending
+            </span>
+          </div>
         </div>
 
         <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
@@ -381,16 +466,17 @@ export default function OutreachDispatcher({ firms }: OutreachDispatcherProps) {
             <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
               <tr>
                 <th className="p-4">Firm Name & City</th>
-                <th className="p-4">Decision Maker & Enriched Email</th>
+                <th className="p-4">Managing Partner & Verified Inbox</th>
                 <th className="p-4">Size</th>
-                <th className="p-4">Email Status</th>
-                <th className="p-4 text-right">Actions</th>
+                <th className="p-4">Outreach Status</th>
+                <th className="p-4 text-right">Actions & Pitch Copy</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/80">
               {firms.map((f) => {
                 const isSent = sentFirmIds.has(f.id);
                 const displayEmail = f.partnerEmail || f.email || "No email";
+                const isUnroutable = displayEmail.startsWith("unverified@");
 
                 return (
                   <tr key={f.id} className="hover:bg-slate-800/30 transition-colors">
@@ -400,7 +486,13 @@ export default function OutreachDispatcher({ firms }: OutreachDispatcherProps) {
                     </td>
                     <td className="p-4">
                       <span className="text-slate-200 block font-medium">{f.managingPartnerName}</span>
-                      <span className="font-mono text-emerald-400 font-semibold">{displayEmail}</span>
+                      <span
+                        className={`font-mono text-xs font-semibold ${
+                          isUnroutable ? "text-amber-400 italic" : "text-emerald-400"
+                        }`}
+                      >
+                        {displayEmail}
+                      </span>
                     </td>
                     <td className="p-4">
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 font-semibold text-amber-400">
@@ -411,28 +503,45 @@ export default function OutreachDispatcher({ firms }: OutreachDispatcherProps) {
                       {isSent ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold text-[11px]">
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Sent</span>
+                          <span>Contacted</span>
+                        </span>
+                      ) : isUnroutable ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium text-[11px]">
+                          Form/Social Only
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 text-slate-400 font-medium text-[11px]">
-                          Ready to Send
+                          Pending Outreach
                         </span>
                       )}
                     </td>
                     <td className="p-4 text-right space-x-2">
+                      {/* Copy Pitch & Form Content Button */}
+                      <button
+                        onClick={() => setActiveModalFirm(f)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 font-semibold text-xs transition-colors"
+                        title="Copy Form, LinkedIn & Email Pitch"
+                      >
+                        <MessageSquare className="w-3 h-3" />
+                        <span>Copy Pitch</span>
+                      </button>
+
                       <button
                         onClick={() => handleSendSingleFirm(f.id)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-semibold text-xs transition-colors"
+                        disabled={isUnroutable}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-semibold text-xs transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        title={isUnroutable ? "Domain has no MX; use Contact Form copy instead" : "Send Resend Email"}
                       >
                         <Send className="w-3 h-3" />
-                        <span>Send Invite</span>
+                        <span>Email</span>
                       </button>
+
                       <Link
                         href={`/claim/${f.claimToken}`}
                         target="_blank"
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors"
                       >
-                        <span>Preview Portal</span>
+                        <span>Portal</span>
                         <ExternalLink className="w-3 h-3" />
                       </Link>
                     </td>
@@ -443,6 +552,236 @@ export default function OutreachDispatcher({ firms }: OutreachDispatcherProps) {
           </table>
         </div>
       </div>
+
+      {/* Outreach Pitch Copy Modal */}
+      {activeModalFirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl relative space-y-6 animate-in fade-in zoom-in-95">
+            <button
+              onClick={() => setActiveModalFirm(null)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Modal Header */}
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-xs font-bold uppercase tracking-wider mb-2">
+                <span>Direct Admin Outreach Generator</span>
+              </div>
+              <h3 className="text-xl font-bold text-white tracking-tight">
+                {activeModalFirm.name} ({activeModalFirm.cityName}, TX)
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Managing Partner: <strong className="text-slate-200">{activeModalFirm.managingPartnerName}</strong> • Claim Token: <code className="font-mono text-amber-400">{activeModalFirm.claimToken}</code>
+              </p>
+            </div>
+
+            {/* Quick Action Links */}
+            <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-800">
+              <a
+                href={activeModalFirm.websiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors"
+              >
+                <Globe className="w-3.5 h-3.5 text-amber-400" />
+                <span>Open Firm Website</span>
+                <ExternalLink className="w-3 h-3 text-slate-400" />
+              </a>
+
+              {activeModalFirm.partnerLinkedIn && (
+                <a
+                  href={activeModalFirm.partnerLinkedIn}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors"
+                >
+                  <Share2 className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Open Social Profile</span>
+                  <ExternalLink className="w-3 h-3 text-slate-400" />
+                </a>
+              )}
+
+              <a
+                href={`https://www.google.com/search?q=${encodeURIComponent(`${activeModalFirm.name} ${activeModalFirm.cityName} contact`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors"
+              >
+                <span>Google Search Contact</span>
+                <ExternalLink className="w-3 h-3 text-slate-400" />
+              </a>
+            </div>
+
+            {/* Message Type Selector Tabs */}
+            <div className="flex gap-2 border-b border-slate-800 pb-2">
+              <button
+                onClick={() => setActiveTab("form")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  activeTab === "form"
+                    ? "bg-amber-500 text-slate-950"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800"
+                }`}
+              >
+                Website Contact Form Message
+              </button>
+              <button
+                onClick={() => setActiveTab("social")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  activeTab === "social"
+                    ? "bg-amber-500 text-slate-950"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800"
+                }`}
+              >
+                LinkedIn / Facebook Direct Message
+              </button>
+              <button
+                onClick={() => setActiveTab("email")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  activeTab === "email"
+                    ? "bg-amber-500 text-slate-950"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800"
+                }`}
+              >
+                Full Verified Notice Email
+              </button>
+            </div>
+
+            {/* Copyable Message Bodies */}
+            <div className="space-y-3">
+              {activeTab === "form" && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>Optimized for Law Firm Website Contact Form & Intake Boxes</span>
+                    <button
+                      onClick={() =>
+                        handleCopyText(
+                          `Notice of Verified Inclusion: ${activeModalFirm.name} (${activeModalFirm.cityName})\n\nDear ${activeModalFirm.managingPartnerName},\n\nYour practice, ${activeModalFirm.name} in ${activeModalFirm.cityName}, has been independently vetted and selected for inclusion in the Tarrant County Small Practice Index on IfYouNeedALawyer.com.\n\nWe built this platform exclusively for 1 to 5 attorney boutique practices to bypass mega-firm billboard mills and connect local clients directly with trial-tested partners.\n\nYour baseline verified listing is active at no cost. Each city is capped at strictly 3 Featured Sponsor Slots, currently open to early adopters at our grandfathered Founders rate.\n\nPreview and claim your verified practice listing here:\n${siteUrl}/claim/${activeModalFirm.claimToken}\n\nBest regards,\nEditorial Staff, IfYouNeedALawyer.com\nNon-lawyer flat advertising directory operating strictly within TDRPC 5.04 & 7.03.`,
+                          "form"
+                        )
+                      }
+                      className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-xs flex items-center gap-1 transition-colors"
+                    >
+                      {copiedKey === "form" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedKey === "form" ? "Copied to Clipboard!" : "Copy Form Message"}</span>
+                    </button>
+                  </div>
+                  <pre className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 font-mono text-xs whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
+{`Notice of Verified Inclusion: ${activeModalFirm.name} (${activeModalFirm.cityName})
+
+Dear ${activeModalFirm.managingPartnerName},
+
+Your practice, ${activeModalFirm.name} in ${activeModalFirm.cityName}, has been independently vetted and selected for inclusion in the Tarrant County Small Practice Index on IfYouNeedALawyer.com.
+
+We built this platform exclusively for 1 to 5 attorney boutique practices to bypass mega-firm billboard mills and connect local clients directly with trial-tested partners.
+
+Your baseline verified listing is active at no cost. Each city is capped at strictly 3 Featured Sponsor Slots, currently open to early adopters at our grandfathered Founders rate.
+
+Preview and claim your verified practice listing here:
+${siteUrl}/claim/${activeModalFirm.claimToken}
+
+Best regards,
+Editorial Staff, IfYouNeedALawyer.com
+Non-lawyer flat advertising directory operating strictly within TDRPC 5.04 & 7.03.`}
+                  </pre>
+                </div>
+              )}
+
+              {activeTab === "social" && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>Short & High-Converting for LinkedIn InMail or Facebook Messenger</span>
+                    <button
+                      onClick={() =>
+                        handleCopyText(
+                          `Hi ${getFirstName(activeModalFirm.managingPartnerName)}, reaching out because ${activeModalFirm.name} in ${activeModalFirm.cityName} was vetted and selected for our Tarrant County Small Practice Directory (ifyouneedalawyer.com).\n\nWe built this index specifically for 1 to 5 attorney practices to give clients direct partner access instead of billboard call centers. Your baseline listing is live at no charge, and you can preview and claim the ${activeModalFirm.cityName} profile here: ${siteUrl}/claim/${activeModalFirm.claimToken}`,
+                          "social"
+                        )
+                      }
+                      className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-xs flex items-center gap-1 transition-colors"
+                    >
+                      {copiedKey === "social" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedKey === "social" ? "Copied!" : "Copy LinkedIn/FB Message"}</span>
+                    </button>
+                  </div>
+                  <pre className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 font-mono text-xs whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
+{`Hi ${getFirstName(activeModalFirm.managingPartnerName)}, reaching out because ${activeModalFirm.name} in ${activeModalFirm.cityName} was vetted and selected for our Tarrant County Small Practice Directory (ifyouneedalawyer.com).
+
+We built this index specifically for 1 to 5 attorney practices to give clients direct partner access instead of billboard call centers. Your baseline listing is live at no charge, and you can preview and claim the ${activeModalFirm.cityName} profile here: ${siteUrl}/claim/${activeModalFirm.claimToken}`}
+                  </pre>
+                </div>
+              )}
+
+              {activeTab === "email" && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>Full Verified Notice Email</span>
+                    <button
+                      onClick={() =>
+                        handleCopyText(
+                          `Subject: Tarrant County Directory: ${activeModalFirm.name} (${getFirstName(activeModalFirm.managingPartnerName)})\n\nDear ${getFirstName(activeModalFirm.managingPartnerName)},\n\nYour practice, ${activeModalFirm.name} in ${activeModalFirm.cityName}, has been vetted and added to IfYouNeedALawyer.com.\n\nWhy Small Practices Choose Us:\nHigh-intent legal consumers in Tarrant County are tired of billboard mega-firms where clients get handed off to call centers. We built this platform strictly for 1 to 5 attorney practices so local clients connect directly with trial-tested partners.\n\nFounders Rate Notice:\nYour baseline verified listing is active at no charge. We also reserve strictly 3 Featured Sponsor Slots per city. As an early partner, you can lock in our Founders Launch rate before the top spots in ${activeModalFirm.cityName} are claimed.\n\nView & Claim Your Practice Listing:\n${siteUrl}/claim/${activeModalFirm.claimToken}\n\n--\nIfYouNeedALawyer.com • Tarrant County Vetted Legal Directory\nNon-lawyer flat advertising directory operating strictly within TDRPC 5.04 & 7.03.\nTo opt out or update your listing preferences, reply directly to this email.`,
+                          "email"
+                        )
+                      }
+                      className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-xs flex items-center gap-1 transition-colors"
+                    >
+                      {copiedKey === "email" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedKey === "email" ? "Copied!" : "Copy Email Notice"}</span>
+                    </button>
+                  </div>
+                  <pre className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 font-mono text-xs whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
+{`Subject: Tarrant County Directory: ${activeModalFirm.name} (${getFirstName(activeModalFirm.managingPartnerName)})
+
+Dear ${getFirstName(activeModalFirm.managingPartnerName)},
+
+Your practice, ${activeModalFirm.name} in ${activeModalFirm.cityName}, has been vetted and added to IfYouNeedALawyer.com.
+
+Why Small Practices Choose Us:
+High-intent legal consumers in Tarrant County are tired of billboard mega-firms where clients get handed off to call centers. We built this platform strictly for 1 to 5 attorney practices so local clients connect directly with trial-tested partners.
+
+Founders Rate Notice:
+Your baseline verified listing is active at no charge. We also reserve strictly 3 Featured Sponsor Slots per city. As an early partner, you can lock in our Founders Launch rate before the top spots in ${activeModalFirm.cityName} are claimed.
+
+View & Claim Your Practice Listing:
+${siteUrl}/claim/${activeModalFirm.claimToken}
+
+--
+IfYouNeedALawyer.com • Tarrant County Vetted Legal Directory
+Non-lawyer flat advertising directory operating strictly within TDRPC 5.04 & 7.03.`}
+                  </pre>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Actions to Log Lead Event */}
+            <div className="pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+              <span className="text-xs text-slate-400">
+                Pasted on website or sent via message?
+              </span>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleMarkManualContact(activeModalFirm.id, "MANUAL_OUTREACH_FORM")}
+                  disabled={markingContacted}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-semibold text-xs transition-colors flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Mark as Contacted via Form</span>
+                </button>
+                <button
+                  onClick={() => handleMarkManualContact(activeModalFirm.id, "MANUAL_OUTREACH_SOCIAL")}
+                  disabled={markingContacted}
+                  className="px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-400 font-semibold text-xs transition-colors flex items-center gap-1.5"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Mark as Contacted via LinkedIn/FB</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

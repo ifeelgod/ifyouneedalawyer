@@ -34,9 +34,20 @@ export default async function AdminOutreachPage() {
     managingPartnerName: f.managingPartnerName,
     email: f.email,
     partnerEmail: f.partnerEmail,
+    websiteUrl: f.websiteUrl,
+    partnerLinkedIn: f.partnerLinkedIn,
     claimToken: f.claimToken,
     tier: f.tier,
     attorneyCount: f.attorneyCount,
+    isContacted: f.leadEvents.some((e) =>
+      ["OUTREACH_EMAIL_SENT", "MANUAL_OUTREACH_FORM", "MANUAL_OUTREACH_SOCIAL"].includes(e.eventType)
+    ),
+    contactHistory: f.leadEvents
+      .filter((e) => ["OUTREACH_EMAIL_SENT", "MANUAL_OUTREACH_FORM", "MANUAL_OUTREACH_SOCIAL"].includes(e.eventType))
+      .map((e) => ({
+        eventType: e.eventType,
+        createdAt: e.createdAt.toISOString(),
+      })),
   }));
 
   return (
