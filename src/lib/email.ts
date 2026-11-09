@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import dns from "dns/promises";
 
 const resendApiKey = process.env.RESEND_API_KEY;
 
@@ -11,6 +12,29 @@ export interface ClaimEmailPayload {
   city: string;
   attorneyCount: number;
   claimUrl: string;
+}
+
+export interface ProEmailPayload {
+  toEmail: string;
+  businessName: string;
+  category: string;
+  city: string;
+  claimUrl: string;
+}
+
+/**
+ * Validates whether the recipient domain has active MX records.
+ * Prevents catastrophic bounce rates on unconfigured domains.
+ */
+export async function verifyDomainMx(email: string): Promise<boolean> {
+  try {
+    const domain = email.split("@")[1]?.toLowerCase().trim();
+    if (!domain) return false;
+    const records = await dns.resolveMx(domain);
+    return Array.isArray(records) && records.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 export async function sendClaimInvitationEmail({
@@ -26,70 +50,114 @@ export async function sendClaimInvitationEmail({
     return { success: false, error: "RESEND_API_KEY not configured" };
   }
 
-  const fromEmail = process.env.RESEND_FROM_EMAIL || "IfYouNeedALawyer <directory@ifyouneedalawyer.com>";
+  // 1. Pre-flight Deliverability Check: Reject unroutable or placeholder emails
+  if (toEmail.startsWith("unverified@") || toEmail.startsWith("contact@")) {
+    console.warn(`[DELIVERABILITY SAFEGUARD] Skipping low-reputation email: ${toEmail}`);
+    return { success: false, error: "Email address skipped to protect sender reputation (no MX or generic contact@ fallback)" };
+  }
 
+  const hasMx = await verifyDomainMx(toEmail);
+  if (!hasMx) {
+    console.warn(`[DELIVERABILITY SAFEGUARD] Domain has no active MX records: ${toEmail}`);
+    return { success: false, error: `Domain has no active MX records (${toEmail})` };
+  }
+
+  const fromEmail = process.env.RESEND_FROM_EMAIL || "IfYouNeedALawyer <directory@ifyouneedalawyer.com>";
+  const cleanPartner = partnerName.replace(/,\s*(Esq|PC|JD|PLLC|LLC)\.?/gi, "").trim();
+  const firstName = cleanPartner.split(/\s+/)[0] || cleanPartner;
+
+  // Clean, professional, high-deliverability subject line that passes Microsoft 365 / Google Workspace spam filters
+  const subject = `Tarrant County Directory: ${firmName} (${firstName})`;
+
+  // High-deliverability conversational HTML (looks authentic and executive, not a promotional spam blast)
   const emailHtml = `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
       <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #090d16; color: #f8fafc; padding: 24px; line-height: 1.6; }
-        .container { max-width: 600px; margin: 0 auto; background: #0f172a; border-radius: 20px; padding: 36px; border: 1px solid #1e293b; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
-        .badge { display: inline-block; background: #f59e0b; color: #090d16; font-weight: 900; font-size: 11px; padding: 4px 12px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 20px; }
-        h1 { font-size: 22px; font-weight: 800; color: #ffffff; margin-bottom: 16px; line-height: 1.3; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0f19; color: #f1f5f9; padding: 24px; line-height: 1.6; }
+        .container { max-width: 600px; margin: 0 auto; background: #111827; border-radius: 16px; padding: 32px; border: 1px solid #1f2937; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+        .badge { display: inline-block; background: #f59e0b; color: #0f172a; font-weight: 800; font-size: 11px; padding: 4px 10px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 20px; }
+        h1 { font-size: 20px; font-weight: 700; color: #ffffff; margin-bottom: 16px; line-height: 1.3; }
         p { font-size: 14px; color: #cbd5e1; margin-bottom: 16px; }
-        .callout { background: #1e293b; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 20px 0; font-size: 13px; color: #e2e8f0; }
-        .alert-box { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 14px; margin: 20px 0; font-size: 12px; color: #fca5a5; }
-        .btn { display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); color: #090d16 !important; font-weight: 900; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-size: 14px; margin: 20px 0; text-transform: uppercase; letter-spacing: 0.03em; box-shadow: 0 10px 15px -3px rgba(245, 158, 11, 0.3); }
-        .footer { font-size: 11px; color: #64748b; margin-top: 36px; border-top: 1px solid #1e293b; padding-top: 18px; }
+        .card { background: #1f2937; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 20px 0; font-size: 13px; color: #e5e7eb; }
+        .scarcity { background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 10px; padding: 14px; margin: 20px 0; font-size: 13px; color: #fde68a; }
+        .btn { display: inline-block; background: #f59e0b; color: #0f172a !important; font-weight: 800; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-size: 14px; margin: 20px 0; }
+        .footer { font-size: 11px; color: #64748b; margin-top: 32px; border-top: 1px solid #1f2937; padding-top: 16px; }
       </style>
     </head>
     <body>
       <div class="container">
-        <span class="badge">Strictly 1–5 Attorney Cap Verified</span>
-        <h1>Dear ${partnerName},</h1>
+        <span class="badge">Strictly 1–5 Attorney Cap</span>
+        <h1>Dear ${firstName},</h1>
         <p>
-          Your practice, <strong>${firmName}</strong> in ${city}, has been independently vetted and selected for inclusion in <strong>IfYouNeedALawyer.com</strong>.
+          Your practice, <strong>${firmName}</strong> in ${city}, has been vetted and added to <strong>IfYouNeedALawyer.com</strong>.
         </p>
-        <div class="callout">
-          <strong>The Problem We Solve for Small Practices:</strong><br>
-          High-intent clients facing divorces, criminal charges, or serious injuries are tired of calling TV billboard mega-firms only to be passed off to junior paralegals. We built IfYouNeedALawyer.com to ban 6+ lawyer billboard mills and connect clients directly with vetted, trial-ready partners.
+        <div class="card">
+          <strong>Why Small Practices Choose Us:</strong><br>
+          High-intent legal consumers in Tarrant County are tired of billboard mega-firms where clients get handed off to call centers. We built this platform strictly for 1 to 5 attorney practices so local clients connect directly with trial-tested partners.
         </div>
-        <div class="alert-box">
-          <strong>Limited Early Adopter Inventory:</strong><br>
-          Your basic listing is 100% active at no cost. We also cap each city to strictly <strong>3 Featured Sponsor Slots</strong>. As an early adopter, you can lock in our deeply discounted Founders Rate before direct competitors in ${city} claim the top slots.
+        <div class="scarcity">
+          <strong>Founders Rate Notice:</strong><br>
+          Your baseline verified listing is active at no charge. We also reserve strictly <strong>3 Featured Sponsor Slots</strong> per city. As an early partner, you can lock in our Founders Launch rate before the top spots in ${city} are claimed.
         </div>
         <div style="text-align: center;">
-          <a href="${claimUrl}" class="btn">Preview & Claim Your Verified Listing &rarr;</a>
+          <a href="${claimUrl}" class="btn">View & Claim Your Practice Listing &rarr;</a>
         </div>
         <p style="font-size: 12px; color: #94a3b8; text-align: center;">
-          Direct access link: <a href="${claimUrl}" style="color: #f59e0b;">${claimUrl}</a>
+          Direct link: <a href="${claimUrl}" style="color: #f59e0b;">${claimUrl}</a>
         </p>
         <div class="footer">
           IfYouNeedALawyer.com • Tarrant County Vetted Legal Directory<br>
-          Non-lawyer flat advertising directory operating strictly within Texas Disciplinary Rules of Professional Conduct (TDRPC) 5.04 & 7.03.
+          Non-lawyer flat advertising directory operating strictly within Texas Disciplinary Rules of Professional Conduct (TDRPC) 5.04 & 7.03.<br>
+          To opt out or update your listing preferences, reply to this email or visit your claim link.
         </div>
       </div>
     </body>
     </html>
   `;
 
+  // Multipart text version dramatically lowers spam scores in Outlook & Gmail
+  const emailText = `Dear ${firstName},
+
+Your practice, ${firmName} in ${city}, has been vetted and added to IfYouNeedALawyer.com.
+
+Why Small Practices Choose Us:
+High-intent legal consumers in Tarrant County are tired of billboard mega-firms where clients get handed off to call centers. We built this platform strictly for 1 to 5 attorney practices so local clients connect directly with trial-tested partners.
+
+Founders Rate Notice:
+Your baseline verified listing is active at no charge. We also reserve strictly 3 Featured Sponsor Slots per city. As an early partner, you can lock in our Founders Launch rate before the top spots in ${city} are claimed.
+
+View & Claim Your Practice Listing:
+${claimUrl}
+
+--
+IfYouNeedALawyer.com • Tarrant County Vetted Legal Directory
+Non-lawyer flat advertising directory operating strictly within TDRPC 5.04 & 7.03.
+To opt out or update your listing preferences, reply directly to this email.`;
+
   try {
     let { data, error } = await resend.emails.send({
       from: fromEmail,
       to: [toEmail],
-      subject: `[Verified Notice] ${firmName} selected for IfYouNeedALawyer.com (${city})`,
+      replyTo: "support@ifyouneedalawyer.com",
+      subject: subject,
       html: emailHtml,
+      text: emailText,
+      headers: {
+        "List-Unsubscribe": `<${claimUrl}?action=optout>`,
+      },
     });
 
-    // Auto-fallback to onboarding@resend.dev for test sends if custom domain is pending verification
     if (error && error.message && error.message.includes("not verified") && !fromEmail.includes("resend.dev")) {
       const fallback = await resend.emails.send({
         from: "IfYouNeedALawyer <onboarding@resend.dev>",
         to: [toEmail],
-        subject: `[Verified Notice] ${firmName} selected for IfYouNeedALawyer.com (${city})`,
+        replyTo: "support@ifyouneedalawyer.com",
+        subject: subject,
         html: emailHtml,
+        text: emailText,
       });
 
       if (!fallback.error) {
@@ -110,14 +178,6 @@ export async function sendClaimInvitationEmail({
   }
 }
 
-export interface ProEmailPayload {
-  toEmail: string;
-  businessName: string;
-  category: string;
-  city: string;
-  claimUrl: string;
-}
-
 export async function sendProInvitationEmail({
   toEmail,
   businessName,
@@ -129,8 +189,18 @@ export async function sendProInvitationEmail({
     return { success: false, error: "RESEND_API_KEY not configured" };
   }
 
+  if (toEmail.startsWith("unverified@") || toEmail.startsWith("contact@")) {
+    return { success: false, error: "Email address skipped to protect sender reputation" };
+  }
+
+  const hasMx = await verifyDomainMx(toEmail);
+  if (!hasMx) {
+    return { success: false, error: `Domain has no active MX records (${toEmail})` };
+  }
+
   const fromEmail = process.env.RESEND_FROM_EMAIL || "IfYouNeedALawyer <directory@ifyouneedalawyer.com>";
   const categoryLabel = category.replace(/_/g, " ");
+  const subject = `Local Referral Partner: ${businessName} (${city})`;
 
   const emailHtml = `
     <!DOCTYPE html>
@@ -138,14 +208,14 @@ export async function sendProInvitationEmail({
     <head>
       <meta charset="utf-8">
       <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #090d16; color: #f8fafc; padding: 24px; line-height: 1.6; }
-        .container { max-width: 600px; margin: 0 auto; background: #0f172a; border-radius: 20px; padding: 36px; border: 1px solid #1e293b; }
-        .badge { display: inline-block; background: #10b981; color: #090d16; font-weight: 900; font-size: 11px; padding: 4px 12px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 20px; }
-        h1 { font-size: 22px; font-weight: 800; color: #ffffff; margin-bottom: 16px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0f19; color: #f1f5f9; padding: 24px; line-height: 1.6; }
+        .container { max-width: 600px; margin: 0 auto; background: #111827; border-radius: 16px; padding: 32px; border: 1px solid #1f2937; }
+        .badge { display: inline-block; background: #10b981; color: #0f172a; font-weight: 800; font-size: 11px; padding: 4px 10px; border-radius: 9999px; text-transform: uppercase; margin-bottom: 20px; }
+        h1 { font-size: 20px; font-weight: 700; color: #ffffff; margin-bottom: 16px; }
         p { font-size: 14px; color: #cbd5e1; margin-bottom: 16px; }
-        .callout { background: #1e293b; border-left: 4px solid #10b981; padding: 16px; border-radius: 8px; margin: 20px 0; font-size: 13px; color: #e2e8f0; }
-        .btn { display: inline-block; background: #10b981; color: #090d16 !important; font-weight: 900; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-size: 14px; margin: 20px 0; text-transform: uppercase; }
-        .footer { font-size: 11px; color: #64748b; margin-top: 36px; border-top: 1px solid #1e293b; padding-top: 18px; }
+        .card { background: #1f2937; border-left: 4px solid #10b981; padding: 16px; border-radius: 8px; margin: 20px 0; font-size: 13px; color: #e5e7eb; }
+        .btn { display: inline-block; background: #10b981; color: #0f172a !important; font-weight: 800; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-size: 14px; margin: 20px 0; }
+        .footer { font-size: 11px; color: #64748b; margin-top: 32px; border-top: 1px solid #1f2937; padding-top: 16px; }
       </style>
     </head>
     <body>
@@ -153,32 +223,50 @@ export async function sendProInvitationEmail({
         <span class="badge">Local Professional Network</span>
         <h1>Hello ${businessName},</h1>
         <p>
-          Your business in ${city} has been added as a recommended local <strong>${categoryLabel}</strong> provider on <strong>IfYouNeedALawyer.com</strong>.
+          Your business in ${city} has been added as a recommended local <strong>${categoryLabel}</strong> partner on <strong>IfYouNeedALawyer.com</strong>.
         </p>
-        <div class="callout">
-          <strong>Why You Were Listed:</strong><br>
-          We connect local trial attorneys with vetted local specialists (including auto injury doctors accepting LOPs, 24/7 licensed bail bondsmen, family mediators, and probate specialists) to facilitate direct client referrals.
+        <div class="card">
+          <strong>Direct Attorney Referrals:</strong><br>
+          We connect vetted solo and small practice trial lawyers with trusted local specialists (auto accident chiropractors accepting Letters of Protection, 24/7 bail bondsmen, mediators, and probate specialists).
         </div>
         <p>
-          Your basic listing is 100% active at no cost. You can view your verified profile and referral details below:
+          Your verified listing is live at no charge. You can review and claim your profile below:
         </p>
         <div style="text-align: center;">
-          <a href="${claimUrl}" class="btn">Preview & Claim Your Business Profile &rarr;</a>
+          <a href="${claimUrl}" class="btn">View & Claim Your Profile &rarr;</a>
         </div>
         <div class="footer">
-          IfYouNeedALawyer.com • Tarrant County Legal & Professional Directory
+          IfYouNeedALawyer.com • Tarrant County Legal & Professional Network
         </div>
       </div>
     </body>
     </html>
   `;
 
+  const emailText = `Hello ${businessName},
+
+Your business in ${city} has been added as a recommended local ${categoryLabel} partner on IfYouNeedALawyer.com.
+
+Direct Attorney Referrals:
+We connect vetted solo and small practice trial lawyers with trusted local specialists (auto accident chiropractors accepting Letters of Protection, 24/7 bail bondsmen, mediators, and probate specialists).
+
+Your verified listing is live at no charge. You can review and claim your profile below:
+${claimUrl}
+
+--
+IfYouNeedALawyer.com • Tarrant County Legal & Professional Network`;
+
   try {
     const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: [toEmail],
-      subject: `[Local Referral Network] ${businessName} selected for IfYouNeedALawyer.com (${city})`,
+      replyTo: "support@ifyouneedalawyer.com",
+      subject: subject,
       html: emailHtml,
+      text: emailText,
+      headers: {
+        "List-Unsubscribe": `<${claimUrl}?action=optout>`,
+      },
     });
 
     if (error) return { success: false, error: error.message };

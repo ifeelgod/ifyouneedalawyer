@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { sendClaimInvitationEmail, sendProInvitationEmail } from "../src/lib/email";
+import { discoverSmartEmail, cleanDomain } from "../src/lib/email-discovery";
 
 const prisma = new PrismaClient();
 
@@ -37,54 +38,7 @@ export interface IngestionProInput {
   is24Hours?: boolean;
 }
 
-function cleanDomain(url: string): string {
-  try {
-    const parsed = new URL(url.startsWith("http") ? url : `https://${url}`);
-    return parsed.hostname.replace(/^www\./, "").toLowerCase();
-  } catch {
-    return "";
-  }
-}
 
-async function scrapeEmailFromDomain(websiteUrl: string, partnerName: string): Promise<{ deskEmail: string; partnerEmail: string }> {
-  const domain = cleanDomain(websiteUrl);
-  if (!domain) {
-    return { deskEmail: "contact@ifyouneedalawyer.com", partnerEmail: "contact@ifyouneedalawyer.com" };
-  }
-
-  const defaultDesk = `contact@${domain}`;
-  const firstName = partnerName.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
-
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    const res = await fetch(websiteUrl, {
-      signal: controller.signal,
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
-    });
-    clearTimeout(timeout);
-
-    if (res.ok) {
-      const text = await res.text();
-      const matches = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi) || [];
-      const domainMatches = matches
-        .map((e) => e.toLowerCase())
-        .filter((e) => e.includes(domain) && !e.includes(".png") && !e.includes("schema.org"));
-
-      if (domainMatches.length > 0) {
-        const partnerSpecific = domainMatches.find((e) => e.split("@")[0].includes(firstName));
-        return {
-          deskEmail: domainMatches[0],
-          partnerEmail: partnerSpecific || domainMatches[0],
-        };
-      }
-    }
-  } catch {
-    // Fall back to clean domain intake
-  }
-
-  return { deskEmail: defaultDesk, partnerEmail: defaultDesk };
-}
 
 export async function ingestCityBatch({
   firms,
@@ -119,8 +73,13 @@ export async function ingestCityBatch({
       continue;
     }
 
-    // 2. Discover & Enrich Emails
-    const { deskEmail, partnerEmail } = await scrapeEmailFromDomain(f.websiteUrl, f.managingPartnerName);
+    // 2. Discover & Enrich Emails with Smart MX Validation & Partner First-Name Priority
+    const discovery = await discoverSmartEmail({
+      websiteUrl: f.websiteUrl,
+      partnerName: f.managingPartnerName,
+    });
+    const deskEmail = discovery.deskEmail;
+    const partnerEmail = discovery.partnerEmail;
 
     // 3. Upsert Firm
     const firm = await prisma.lawFirm.upsert({
