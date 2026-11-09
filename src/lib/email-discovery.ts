@@ -85,6 +85,33 @@ function extractMailtoAndRegex(html: string, domain: string): string[] {
   return [...new Set(valid)];
 }
 
+function extractSocialLinks(html: string): { facebookUrl: string | null; linkedinUrl: string | null } {
+  const fbMatch = html.match(/https?:\/\/(www\.)?facebook\.com\/([a-zA-Z0-9._-]+)/i);
+  const liMatch = html.match(/https?:\/\/(www\.)?linkedin\.com\/(in|company)\/([a-zA-Z0-9._-]+)/i);
+
+  const cleanFb = fbMatch && !fbMatch[0].includes("sharer") && !fbMatch[0].includes("tr") ? fbMatch[0] : null;
+  const cleanLi = liMatch && !liMatch[0].includes("shareArticle") ? liMatch[0] : null;
+
+  return { facebookUrl: cleanFb, linkedinUrl: cleanLi };
+}
+
+async function scrapeFacebookPageEmail(facebookUrl: string, domain: string): Promise<string | null> {
+  try {
+    const html = await scrapeUrl(facebookUrl);
+    if (!html) return null;
+
+    const emails = extractMailtoAndRegex(html, domain);
+    const domainMatch = emails.find((e) => e.includes(domain));
+    if (domainMatch) return domainMatch;
+
+    // Check for any public direct email (e.g. gmail/outlook if solo practice)
+    if (emails.length > 0) return emails[0];
+  } catch {
+    // Ignore social rate limit or private block
+  }
+  return null;
+}
+
 export async function discoverSmartEmail({
   websiteUrl,
   partnerName,
@@ -95,7 +122,9 @@ export async function discoverSmartEmail({
   partnerEmail: string;
   deskEmail: string;
   hasMx: boolean;
-  source: "SCRAPED_MAILTO" | "SCRAPED_PAGE" | "FIRST_NAME_PREDICTED" | "NO_MX";
+  facebookUrl: string | null;
+  linkedinUrl: string | null;
+  source: "SCRAPED_MAILTO" | "SCRAPED_PAGE" | "FACEBOOK_PAGE" | "FIRST_NAME_PREDICTED" | "NO_MX";
 }> {
   const domain = cleanDomain(websiteUrl);
   if (!domain) {
@@ -103,6 +132,8 @@ export async function discoverSmartEmail({
       partnerEmail: "directory@ifyouneedalawyer.com",
       deskEmail: "directory@ifyouneedalawyer.com",
       hasMx: false,
+      facebookUrl: null,
+      linkedinUrl: null,
       source: "NO_MX",
     };
   }
@@ -113,15 +144,19 @@ export async function discoverSmartEmail({
       partnerEmail: `unverified@${domain}`,
       deskEmail: `unverified@${domain}`,
       hasMx: false,
+      facebookUrl: null,
+      linkedinUrl: null,
       source: "NO_MX",
     };
   }
 
+  // Parse partner names and initials (e.g., "Yvonne N. Kafor" -> initials "ynk")
   const cleanName = partnerName.replace(/,\s*(Esq|PC|JD|PLLC|LLC)\.?/gi, "").trim();
-  const nameParts = cleanName.split(/\s+/);
-  const firstName = nameParts[0].toLowerCase().replace(/[^a-z]/g, "");
-  const lastName = (nameParts.length > 1 ? nameParts[nameParts.length - 1] : "").toLowerCase().replace(/[^a-z]/g, "");
+  const nameParts = cleanName.split(/\s+/).map((p) => p.replace(/[^a-zA-Z]/g, ""));
+  const firstName = nameParts[0]?.toLowerCase() || "";
+  const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1].toLowerCase() : "";
   const firstInitial = firstName.charAt(0);
+  const initials = nameParts.map((p) => p.charAt(0).toLowerCase()).join("");
 
   // Deep Scrape Candidate Pages in parallel
   const baseUrl = websiteUrl.replace(/\/+$/, "");
@@ -135,23 +170,44 @@ export async function discoverSmartEmail({
 
   const htmlResults = await Promise.all(candidateUrls.map((u) => scrapeUrl(u)));
   let allDiscovered: string[] = [];
+  let foundFb: string | null = null;
+  let foundLi: string | null = null;
 
   for (const html of htmlResults) {
     if (html) {
       allDiscovered.push(...extractMailtoAndRegex(html, domain));
+      const social = extractSocialLinks(html);
+      if (social.facebookUrl && !foundFb) foundFb = social.facebookUrl;
+      if (social.linkedinUrl && !foundLi) foundLi = social.linkedinUrl;
     }
   }
 
   allDiscovered = [...new Set(allDiscovered)];
 
-  // 1. Look for partner matches on domain
+  // 1. If Facebook page found, attempt to scrape direct bio email
+  if (foundFb) {
+    const fbEmail = await scrapeFacebookPageEmail(foundFb, domain);
+    if (fbEmail) {
+      return {
+        partnerEmail: fbEmail,
+        deskEmail: fbEmail,
+        hasMx: true,
+        facebookUrl: foundFb,
+        linkedinUrl: foundLi,
+        source: "FACEBOOK_PAGE",
+      };
+    }
+  }
+
+  // 2. Look for partner matches on domain (including middle initials, e.g. ynk@)
   const domainEmails = allDiscovered.filter((e) => e.includes(domain));
   const partnerMatched = domainEmails.find((e) => {
-    const user = e.split("@")[0];
+    const user = e.split("@")[0].toLowerCase();
     return (
       user === firstName ||
       user === `${firstName}.${lastName}` ||
       user === `${firstInitial}${lastName}` ||
+      (initials.length >= 2 && user === initials) ||
       user.includes(firstName) ||
       (lastName.length > 3 && user.includes(lastName))
     );
@@ -162,11 +218,13 @@ export async function discoverSmartEmail({
       partnerEmail: partnerMatched,
       deskEmail: domainEmails[0] || partnerMatched,
       hasMx: true,
+      facebookUrl: foundFb,
+      linkedinUrl: foundLi,
       source: "SCRAPED_MAILTO",
     };
   }
 
-  // 2. Look for office intake emails on domain (info, intake, office, inquiry)
+  // 3. Look for office intake emails on domain (info, intake, office, inquiry)
   const intakePref = ["info", "office", "intake", "inquiry", "frontdesk", "help", "admin", "legal"];
   const officeMatched = domainEmails.find((e) => {
     const user = e.split("@")[0];
@@ -178,6 +236,8 @@ export async function discoverSmartEmail({
       partnerEmail: `${firstName}@${domain}`,
       deskEmail: officeMatched,
       hasMx: true,
+      facebookUrl: foundFb,
+      linkedinUrl: foundLi,
       source: "FIRST_NAME_PREDICTED",
     };
   }
@@ -187,16 +247,20 @@ export async function discoverSmartEmail({
       partnerEmail: `${firstName}@${domain}`,
       deskEmail: domainEmails[0],
       hasMx: true,
+      facebookUrl: foundFb,
+      linkedinUrl: foundLi,
       source: "SCRAPED_PAGE",
     };
   }
 
-  // 3. Predicted First-Name (standard for 90%+ solo and small boutique firms in Texas)
-  // NEVER default to contact@ (honeypot/unconfigured address)
+  // 4. Predicted First-Name (standard for solo and small law firms)
+  // NEVER use contact@
   return {
     partnerEmail: `${firstName}@${domain}`,
     deskEmail: `info@${domain}`,
     hasMx: true,
+    facebookUrl: foundFb,
+    linkedinUrl: foundLi,
     source: "FIRST_NAME_PREDICTED",
   };
 }

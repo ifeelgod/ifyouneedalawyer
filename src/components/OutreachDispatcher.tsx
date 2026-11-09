@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Mail, Send, CheckCircle2, AlertCircle, Loader2, Sparkles, ExternalLink } from "lucide-react";
+import { Mail, Send, CheckCircle2, AlertCircle, Loader2, Sparkles, ExternalLink, RefreshCw } from "lucide-react";
 import Link from "next/link";
 
 interface FirmItem {
@@ -20,6 +20,16 @@ interface OutreachDispatcherProps {
   firms: FirmItem[];
 }
 
+interface MatchedBounceItem {
+  id: string;
+  firmName: string;
+  cityName: string;
+  bouncedEmail: string;
+  newPartnerEmail: string | null;
+  canResend: boolean;
+  status: string;
+}
+
 export default function OutreachDispatcher({ firms }: OutreachDispatcherProps) {
   const [testEmail, setTestEmail] = useState("");
   const [testStatus, setTestStatus] = useState<string | null>(null);
@@ -28,6 +38,13 @@ export default function OutreachDispatcher({ firms }: OutreachDispatcherProps) {
   const [batchStatus, setBatchStatus] = useState<string | null>(null);
   const [isBatchSending, setIsBatchSending] = useState(false);
   const [sentFirmIds, setSentFirmIds] = useState<Set<string>>(new Set());
+
+  // Bounces Resolution State
+  const [bounceInput, setBounceInput] = useState("");
+  const [isAnalyzingBounces, setIsAnalyzingBounces] = useState(false);
+  const [isResendingBounces, setIsResendingBounces] = useState(false);
+  const [matchedBounces, setMatchedBounces] = useState<MatchedBounceItem[] | null>(null);
+  const [bounceActionStatus, setBounceActionStatus] = useState<string | null>(null);
 
   // Handle single test send to user's email
   const handleSendTest = async (e: React.FormEvent) => {
@@ -110,12 +127,74 @@ export default function OutreachDispatcher({ firms }: OutreachDispatcherProps) {
       } catch {
         failCount++;
       }
-      // Small delay between sends to respect rate limits
       await new Promise((r) => setTimeout(r, 600));
     }
 
     setIsBatchSending(false);
     setBatchStatus(`Completed! Successfully sent: ${successCount} emails. Failed: ${failCount}.`);
+  };
+
+  // Analyze pasted bounces or CSV
+  const handleAnalyzeBounces = async () => {
+    if (!bounceInput.trim()) return;
+
+    setIsAnalyzingBounces(true);
+    setBounceActionStatus(null);
+
+    try {
+      const res = await fetch("/api/admin/outreach/bounces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rawText: bounceInput, executeSend: false }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setMatchedBounces(data.matched);
+        setBounceActionStatus(
+          `Identified ${data.totalBouncesProvided} bounce records. Successfully matched ${data.matchedFirmsCount} law firms in directory.`
+        );
+      } else {
+        setBounceActionStatus(`Error: ${data.error}`);
+      }
+    } catch (err: any) {
+      setBounceActionStatus(`Exception: ${err.message}`);
+    } finally {
+      setIsAnalyzingBounces(false);
+    }
+  };
+
+  // Execute Re-dispatch to Bounced Firms
+  const handleExecuteResend = async () => {
+    if (!bounceInput.trim()) return;
+    if (!confirm("Are you ready to dispatch invitations to all matched firms using their corrected partner emails?")) {
+      return;
+    }
+
+    setIsResendingBounces(true);
+    setBounceActionStatus("Dispatching corrected invitations via Resend...");
+
+    try {
+      const res = await fetch("/api/admin/outreach/bounces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rawText: bounceInput, executeSend: true }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setMatchedBounces(data.matched);
+        setBounceActionStatus(
+          `Re-dispatch Complete! Successfully sent: ${data.sentCount} emails. Skipped/Failed: ${data.failedCount}.`
+        );
+      } else {
+        setBounceActionStatus(`Error: ${data.error}`);
+      }
+    } catch (err: any) {
+      setBounceActionStatus(`Exception: ${err.message}`);
+    } finally {
+      setIsResendingBounces(false);
+    }
   };
 
   return (
@@ -195,6 +274,97 @@ export default function OutreachDispatcher({ firms }: OutreachDispatcherProps) {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Bounced Email Resolver & Re-dispatch Panel */}
+      <div className="p-6 rounded-2xl border border-slate-800 bg-slate-900/70 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+            <RefreshCw className="w-5 h-5 text-amber-400" />
+            <span>Resend Bounced Email Resolver (Import CSV or Paste Bounced Inboxes)</span>
+          </div>
+          <span className="text-[11px] text-slate-400">
+            Auto-matches old contact@ bounces to new direct partner emails
+          </span>
+        </div>
+
+        <p className="text-xs text-slate-300 leading-relaxed">
+          Paste the list of bounced emails or raw CSV export from your Resend dashboard. The engine matches each firm, verifies active mail exchange (MX) servers, and re-dispatches the Founders Launch invitation to the managing partner's inbox.
+        </p>
+
+        <textarea
+          rows={3}
+          placeholder="Paste bounced emails or CSV text here (e.g., contact@dougwrightlaw.com, contact@thekaforlawfirm.com, contact@bryanhoellerlaw.com)..."
+          value={bounceInput}
+          onChange={(e) => setBounceInput(e.target.value)}
+          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-amber-500"
+        />
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={handleAnalyzeBounces}
+            disabled={isAnalyzingBounces || !bounceInput.trim()}
+            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
+          >
+            {isAnalyzingBounces ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            <span>Analyze Bounces & Match Partner Inboxes</span>
+          </button>
+
+          {matchedBounces && matchedBounces.some((m) => m.canResend) && (
+            <button
+              onClick={handleExecuteResend}
+              disabled={isResendingBounces}
+              className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-1.5 disabled:opacity-50 shadow-md shadow-emerald-500/20"
+            >
+              {isResendingBounces ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              <span>Resend to Corrected Partner Inboxes Now</span>
+            </button>
+          )}
+        </div>
+
+        {bounceActionStatus && (
+          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-amber-300 font-medium">
+            {bounceActionStatus}
+          </div>
+        )}
+
+        {/* Matched Bounces Table */}
+        {matchedBounces && matchedBounces.length > 0 && (
+          <div className="mt-4 overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/60">
+            <table className="w-full text-left text-xs text-slate-300">
+              <thead className="bg-slate-950 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                <tr>
+                  <th className="p-3">Firm Name</th>
+                  <th className="p-3">Old Bounced Email</th>
+                  <th className="p-3">Corrected Partner Email</th>
+                  <th className="p-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {matchedBounces.map((item, idx) => (
+                  <tr key={idx} className="hover:bg-slate-900/50">
+                    <td className="p-3 font-medium text-white">{item.firmName} ({item.cityName})</td>
+                    <td className="p-3 font-mono text-red-400">{item.bouncedEmail}</td>
+                    <td className="p-3 font-mono text-emerald-400 font-semibold">{item.newPartnerEmail || "None found"}</td>
+                    <td className="p-3">
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded text-[11px] font-semibold ${
+                          item.status.includes("Sent successfully")
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : item.canResend
+                            ? "bg-sky-500/10 text-sky-400"
+                            : "bg-amber-500/10 text-amber-400"
+                        }`}
+                      >
+                        {item.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Discovered Law Firms Table with Enriched Emails & Send Buttons */}
