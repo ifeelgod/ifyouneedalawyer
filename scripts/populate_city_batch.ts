@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { sendClaimInvitationEmail } from "../src/lib/email";
+import { sendClaimInvitationEmail, sendProInvitationEmail } from "../src/lib/email";
 
 const prisma = new PrismaClient();
 
@@ -89,7 +89,7 @@ async function scrapeEmailFromDomain(websiteUrl: string, partnerName: string): P
 export async function ingestCityBatch({
   firms,
   pros,
-  autoSendEmails = false,
+  autoSendEmails = true,
 }: {
   firms: IngestionFirmInput[];
   pros: IngestionProInput[];
@@ -189,7 +189,7 @@ export async function ingestCityBatch({
     ingestedFirms++;
     console.log(`[INGESTED] ${firm.name} (${city.name}) => Email: ${partnerEmail}`);
 
-    // 5. Automated Outreach Dispatch
+    // 5. Automated Outreach Dispatch for Law Firms
     if (autoSendEmails && partnerEmail) {
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ifyouneedalawyer.com";
       const claimUrl = `${siteUrl}/claim/${firm.claimToken}`;
@@ -205,10 +205,20 @@ export async function ingestCityBatch({
 
       if (res.success) {
         emailsSent++;
+        await prisma.leadEvent.create({
+          data: {
+            eventType: "OUTREACH_EMAIL_SENT",
+            targetType: "LAW_FIRM",
+            lawFirmId: firm.id,
+          },
+        });
         console.log(`  -> [OUTREACH DISPATCHED] Sent Founders invite to ${partnerEmail}`);
       } else {
         console.warn(`  -> [OUTREACH QUEUED] Email ready for ${partnerEmail} (${res.error})`);
       }
+
+      // 600ms rate limiting delay
+      await new Promise((r) => setTimeout(r, 600));
     }
   }
 
@@ -223,7 +233,7 @@ export async function ingestCityBatch({
     const domain = cleanDomain(p.websiteUrl);
     const deskEmail = domain ? `info@${domain}` : "referrals@ifyouneedalawyer.com";
 
-    await prisma.associatedPro.upsert({
+    const pro = await prisma.associatedPro.upsert({
       where: { slug: p.slug },
       update: {
         businessName: p.businessName,
@@ -255,8 +265,37 @@ export async function ingestCityBatch({
         cityId: city.id,
       },
     });
+
     ingestedPros++;
+    console.log(`[INGESTED PRO] ${pro.businessName} (${city.name}) => Email: ${deskEmail}`);
+
+    if (autoSendEmails && deskEmail) {
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ifyouneedalawyer.com";
+      const claimUrl = `${siteUrl}/claim/${pro.claimToken}`;
+
+      const res = await sendProInvitationEmail({
+        toEmail: deskEmail,
+        businessName: pro.businessName,
+        category: pro.category,
+        city: city.name,
+        claimUrl,
+      });
+
+      if (res.success) {
+        emailsSent++;
+        await prisma.leadEvent.create({
+          data: {
+            eventType: "OUTREACH_EMAIL_SENT",
+            targetType: "ASSOCIATED_PRO",
+            associatedProId: pro.id,
+          },
+        });
+        console.log(`  -> [PRO OUTREACH DISPATCHED] Sent Partner invite to ${deskEmail}`);
+      }
+
+      await new Promise((r) => setTimeout(r, 600));
+    }
   }
 
-  console.log(`\nBatch Finished! Ingested ${ingestedFirms} firms, ${ingestedPros} pros. Emails dispatched: ${emailsSent}.`);
+  console.log(`\nBatch Finished! Ingested ${ingestedFirms} firms, ${ingestedPros} pros. Total emails dispatched: ${emailsSent}.`);
 }

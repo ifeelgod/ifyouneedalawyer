@@ -109,3 +109,81 @@ export async function sendClaimInvitationEmail({
     return { success: false, error: err.message };
   }
 }
+
+export interface ProEmailPayload {
+  toEmail: string;
+  businessName: string;
+  category: string;
+  city: string;
+  claimUrl: string;
+}
+
+export async function sendProInvitationEmail({
+  toEmail,
+  businessName,
+  category,
+  city,
+  claimUrl,
+}: ProEmailPayload) {
+  if (!resend) {
+    return { success: false, error: "RESEND_API_KEY not configured" };
+  }
+
+  const fromEmail = process.env.RESEND_FROM_EMAIL || "IfYouNeedALawyer <directory@ifyouneedalawyer.com>";
+  const categoryLabel = category.replace(/_/g, " ");
+
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #090d16; color: #f8fafc; padding: 24px; line-height: 1.6; }
+        .container { max-width: 600px; margin: 0 auto; background: #0f172a; border-radius: 20px; padding: 36px; border: 1px solid #1e293b; }
+        .badge { display: inline-block; background: #10b981; color: #090d16; font-weight: 900; font-size: 11px; padding: 4px 12px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 20px; }
+        h1 { font-size: 22px; font-weight: 800; color: #ffffff; margin-bottom: 16px; }
+        p { font-size: 14px; color: #cbd5e1; margin-bottom: 16px; }
+        .callout { background: #1e293b; border-left: 4px solid #10b981; padding: 16px; border-radius: 8px; margin: 20px 0; font-size: 13px; color: #e2e8f0; }
+        .btn { display: inline-block; background: #10b981; color: #090d16 !important; font-weight: 900; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-size: 14px; margin: 20px 0; text-transform: uppercase; }
+        .footer { font-size: 11px; color: #64748b; margin-top: 36px; border-top: 1px solid #1e293b; padding-top: 18px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <span class="badge">Local Professional Network</span>
+        <h1>Hello ${businessName},</h1>
+        <p>
+          Your business in ${city} has been added as a recommended local <strong>${categoryLabel}</strong> provider on <strong>IfYouNeedALawyer.com</strong>.
+        </p>
+        <div class="callout">
+          <strong>Why You Were Listed:</strong><br>
+          We connect local trial attorneys with vetted local specialists (including auto injury doctors accepting LOPs, 24/7 licensed bail bondsmen, family mediators, and probate specialists) to facilitate direct client referrals.
+        </div>
+        <p>
+          Your basic listing is 100% active at no cost. You can view your verified profile and referral details below:
+        </p>
+        <div style="text-align: center;">
+          <a href="${claimUrl}" class="btn">Preview & Claim Your Business Profile &rarr;</a>
+        </div>
+        <div class="footer">
+          IfYouNeedALawyer.com • Tarrant County Legal & Professional Directory
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: fromEmail,
+      to: [toEmail],
+      subject: `[Local Referral Network] ${businessName} selected for IfYouNeedALawyer.com (${city})`,
+      html: emailHtml,
+    });
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, data };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
