@@ -44,6 +44,27 @@ export default function AssociatedProCard({ pro, practiceAreaSlug }: AssociatedP
     }
   };
 
+  const handleTrackWebsite = () => {
+    try {
+      fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventType: "WEBSITE_CLICK",
+          targetType: "ASSOCIATED_PRO",
+          targetId: pro.id,
+          practiceAreaSlug,
+          citySlug: pro.city.slug,
+        }),
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const cleanWebsite = pro.websiteUrl.startsWith("http") ? pro.websiteUrl : `https://${pro.websiteUrl}`;
+  const websiteUrlWithUtm = `${cleanWebsite}${cleanWebsite.includes("?") ? "&" : "?"}utm_source=ifyouneedalawyer.com&utm_medium=directory_referral`;
+
   const getCategoryIcon = (cat: string) => {
     switch (cat) {
       case "CHIROPRACTOR_MD":
@@ -129,10 +150,11 @@ export default function AssociatedProCard({ pro, practiceAreaSlug }: AssociatedP
         )}
 
         <a
-          href={`/out/pro/${pro.slug}`}
+          href={websiteUrlWithUtm}
           target="_blank"
           rel="noopener noreferrer"
-          className="p-2 rounded-lg border border-slate-700 hover:border-slate-600 bg-slate-800/60 text-slate-300 text-xs flex items-center justify-center"
+          onClick={handleTrackWebsite}
+          className="p-2 rounded-lg border border-slate-700 hover:border-slate-600 bg-slate-800/60 hover:bg-slate-700 text-slate-300 hover:text-white text-xs flex items-center justify-center transition-colors"
           title="Visit Provider Website"
         >
           <Globe className="w-3.5 h-3.5" />

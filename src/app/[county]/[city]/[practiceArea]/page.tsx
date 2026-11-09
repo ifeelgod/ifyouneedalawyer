@@ -3,7 +3,7 @@ import LawFirmCard from "@/components/LawFirmCard";
 import AssociatedProCard from "@/components/AssociatedProCard";
 import Link from "next/link";
 import { Scale, Users, ShieldAlert, Sparkles, MapPin, Building, ArrowLeft } from "lucide-react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 interface PageProps {
   params: Promise<{
@@ -19,6 +19,22 @@ interface PageProps {
 export default async function CategoryDirectoryPage({ params, searchParams }: PageProps) {
   const { county: countySlug, city: citySlug, practiceArea: paSlug } = await params;
   const { size = "all" } = await searchParams;
+
+  // Intercept any legacy /out/firm/[slug] or /out/pro/[slug] calls
+  if (countySlug === "out") {
+    if (citySlug === "firm") {
+      const firm = await prisma.lawFirm.findUnique({ where: { slug: paSlug } });
+      if (firm?.websiteUrl) {
+        redirect(firm.websiteUrl.startsWith("http") ? firm.websiteUrl : `https://${firm.websiteUrl}`);
+      }
+    } else if (citySlug === "pro") {
+      const pro = await prisma.associatedPro.findUnique({ where: { slug: paSlug } });
+      if (pro?.websiteUrl) {
+        redirect(pro.websiteUrl.startsWith("http") ? pro.websiteUrl : `https://${pro.websiteUrl}`);
+      }
+    }
+    notFound();
+  }
 
   const county = await prisma.county.findUnique({
     where: { slug: countySlug },

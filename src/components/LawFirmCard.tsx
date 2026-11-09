@@ -57,6 +57,27 @@ export default function LawFirmCard({ firm, practiceAreaSlug, citySlug }: LawFir
     }
   };
 
+  const handleTrackWebsite = () => {
+    try {
+      fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventType: "WEBSITE_CLICK",
+          targetType: "LAW_FIRM",
+          targetId: firm.id,
+          practiceAreaSlug,
+          citySlug,
+        }),
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const cleanWebsite = firm.websiteUrl.startsWith("http") ? firm.websiteUrl : `https://${firm.websiteUrl}`;
+  const websiteUrlWithUtm = `${cleanWebsite}${cleanWebsite.includes("?") ? "&" : "?"}utm_source=ifyouneedalawyer.com&utm_medium=directory_referral`;
+
   const handleInquirySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -191,14 +212,22 @@ export default function LawFirmCard({ firm, practiceAreaSlug, citySlug }: LawFir
           )}
 
           <a
-            href={`/out/firm/${firm.slug}`}
+            href={websiteUrlWithUtm}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={handleTrackWebsite}
             className="w-full sm:w-auto px-4 py-2 rounded-xl border border-slate-700 hover:border-slate-500 bg-slate-800/80 hover:bg-slate-800 text-slate-200 text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
           >
             <Globe className="w-3.5 h-3.5" />
             <span>Visit Firm Website</span>
           </a>
+
+          <Link
+            href={`/firm/${firm.slug}`}
+            className="w-full sm:w-auto px-4 py-1 text-center text-xs text-slate-400 hover:text-amber-400 font-medium transition-colors"
+          >
+            View Full Firm Profile &rarr;
+          </Link>
 
           <button
             onClick={() => setShowInquiryModal(true)}
