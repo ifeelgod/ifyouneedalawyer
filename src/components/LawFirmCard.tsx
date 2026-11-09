@@ -81,20 +81,31 @@ export default function LawFirmCard({ firm, practiceAreaSlug, citySlug }: LawFir
   };
 
   const isFeatured = firm.tier === "FEATURED_SPONSOR";
+  const isVerifiedPartner = firm.tier === "VERIFIED_PRO";
 
   return (
     <div
       className={`rounded-2xl border transition-all p-6 sm:p-7 relative ${
         isFeatured
-          ? "border-amber-500/50 bg-gradient-to-b from-slate-900/95 via-slate-900/80 to-slate-950 shadow-xl shadow-amber-500/5 ring-1 ring-amber-500/20"
+          ? "border-amber-500/60 bg-gradient-to-b from-amber-500/10 via-slate-900 to-slate-950 shadow-2xl shadow-amber-500/10 ring-1 ring-amber-500/30"
+          : isVerifiedPartner
+          ? "border-emerald-500/50 bg-gradient-to-b from-emerald-500/5 via-slate-900 to-slate-950 shadow-xl shadow-emerald-500/5 ring-1 ring-emerald-500/20"
           : "border-slate-800 bg-slate-900/40 hover:border-slate-700"
       }`}
     >
-      {/* Featured Badge */}
+      {/* Featured Sponsor Badge */}
       {isFeatured && (
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider mb-4 shadow-sm">
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Top Featured Boutique Sponsor • Direct Partner Access</span>
+          <span>Top Featured Sponsor • Exclusive Partner Placement</span>
+        </div>
+      )}
+
+      {/* Verified Partner Badge */}
+      {isVerifiedPartner && (
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold text-xs uppercase tracking-wider mb-4">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Verified Premier Partner • Priority Placement</span>
         </div>
       )}
 

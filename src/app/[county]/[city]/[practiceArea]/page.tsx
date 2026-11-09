@@ -62,11 +62,23 @@ export default async function CategoryDirectoryPage({ params, searchParams }: Pa
         include: { practiceArea: true },
       },
     },
-    orderBy: [
-      { tier: "desc" }, // FEATURED_SPONSOR first
-      { featuredRank: "asc" },
-      { attorneyCount: "asc" },
-    ],
+  });
+
+  // Strict hierarchical tier sorting: FEATURED_SPONSOR (Top 3) -> VERIFIED_PRO (Paying Premier) -> FREE
+  const tierWeight: Record<string, number> = {
+    FEATURED_SPONSOR: 3,
+    VERIFIED_PRO: 2,
+    FREE: 1,
+  };
+
+  firms.sort((a, b) => {
+    const weightA = tierWeight[a.tier] || 1;
+    const weightB = tierWeight[b.tier] || 1;
+    if (weightA !== weightB) return weightB - weightA;
+    if (a.featuredRank && b.featuredRank) return a.featuredRank - b.featuredRank;
+    if (a.featuredRank) return -1;
+    if (b.featuredRank) return 1;
+    return a.attorneyCount - b.attorneyCount;
   });
 
   // Fetch Contextual Associated Professionals for this practice vertical
