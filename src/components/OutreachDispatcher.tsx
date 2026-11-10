@@ -16,6 +16,8 @@ import {
   Globe,
   Share2,
   X,
+  Search,
+  Filter,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -73,7 +75,45 @@ export default function OutreachDispatcher({ firms }: OutreachDispatcherProps) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [markingContacted, setMarkingContacted] = useState(false);
 
+  // Outreach Search & Filtering State
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "CONTACTED" | "PENDING" | "DIRECT_EMAIL" | "FORM_NEEDED">("ALL");
+  const [cityFilter, setCityFilter] = useState<string>("ALL");
+
   const siteUrl = typeof window !== "undefined" ? window.location.origin : "https://ifyouneedalawyer.com";
+
+  // Unique sorted cities list for dropdown
+  const citiesList = Array.from(new Set(firms.map((f) => f.cityName))).sort();
+
+  // Real-time filtered firms by search term (firm name, partner name, email, website, city) and status
+  const filteredFirms = firms.filter((f) => {
+    const isSent = sentFirmIds.has(f.id);
+    const displayEmail = (f.partnerEmail || f.email || "").toLowerCase();
+    const isUnroutable = displayEmail.startsWith("unverified@");
+
+    // Status Filter
+    if (statusFilter === "CONTACTED" && !isSent) return false;
+    if (statusFilter === "PENDING" && isSent) return false;
+    if (statusFilter === "DIRECT_EMAIL" && (isUnroutable || !displayEmail || displayEmail === "no email")) return false;
+    if (statusFilter === "FORM_NEEDED" && (!isUnroutable && displayEmail && displayEmail !== "no email")) return false;
+
+    // City Filter
+    if (cityFilter !== "ALL" && f.cityName !== cityFilter) return false;
+
+    // Search Term matching firm name, partner name, direct/raw email, domain, or city
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      const matchesName = f.name.toLowerCase().includes(term);
+      const matchesPartner = f.managingPartnerName.toLowerCase().includes(term);
+      const matchesEmail =
+        displayEmail.includes(term) || (f.email && f.email.toLowerCase().includes(term));
+      const matchesCity = f.cityName.toLowerCase().includes(term);
+      const matchesWebsite = f.websiteUrl ? f.websiteUrl.toLowerCase().includes(term) : false;
+      return matchesName || matchesPartner || matchesEmail || matchesCity || matchesWebsite;
+    }
+
+    return true;
+  });
 
   // Handle single test send to user's email
   const handleSendTest = async (e: React.FormEvent) => {
@@ -461,6 +501,132 @@ export default function OutreachDispatcher({ firms }: OutreachDispatcherProps) {
           </div>
         </div>
 
+        {/* Live Search & Filter Bar */}
+        <div className="p-4 rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-md space-y-3">
+          <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
+            {/* Search Input for Firm, Partner, Email, City */}
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <Search className="w-4 h-4 text-amber-400" />
+              </div>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search firm name, partner name, email (e.g. ynk@, @domain.com), city..."
+                className="w-full pl-10 pr-9 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 text-xs font-medium focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition-all"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm("")}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* City Dropdown */}
+            <div className="flex items-center gap-2 shrink-0">
+              <label className="text-xs text-slate-400 font-medium hidden sm:inline">City:</label>
+              <select
+                value={cityFilter}
+                onChange={(e) => setCityFilter(e.target.value)}
+                className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs font-medium focus:outline-none focus:border-amber-400"
+              >
+                <option value="ALL">All Cities ({citiesList.length})</option>
+                {citiesList.map((city) => (
+                  <option key={city} value={city}>
+                    {city}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Quick Filter Pills & Result Counter */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/60 text-xs">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-slate-500 text-[11px] font-semibold mr-1">Filter:</span>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("ALL")}
+                className={`px-2.5 py-1 rounded-lg font-semibold text-[11px] transition-colors ${
+                  statusFilter === "ALL"
+                    ? "bg-amber-500 text-slate-950 shadow-sm"
+                    : "bg-slate-800/80 hover:bg-slate-800 text-slate-300"
+                }`}
+              >
+                All ({firms.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("CONTACTED")}
+                className={`px-2.5 py-1 rounded-lg font-semibold text-[11px] transition-colors ${
+                  statusFilter === "CONTACTED"
+                    ? "bg-emerald-500 text-slate-950 shadow-sm"
+                    : "bg-slate-800/80 hover:bg-slate-800 text-emerald-400"
+                }`}
+              >
+                Contacted ({sentFirmIds.size})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("PENDING")}
+                className={`px-2.5 py-1 rounded-lg font-semibold text-[11px] transition-colors ${
+                  statusFilter === "PENDING"
+                    ? "bg-amber-500 text-slate-950 shadow-sm"
+                    : "bg-slate-800/80 hover:bg-slate-800 text-amber-400"
+                }`}
+              >
+                Pending ({firms.length - sentFirmIds.size})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("DIRECT_EMAIL")}
+                className={`px-2.5 py-1 rounded-lg font-semibold text-[11px] transition-colors ${
+                  statusFilter === "DIRECT_EMAIL"
+                    ? "bg-sky-500 text-slate-950 shadow-sm"
+                    : "bg-slate-800/80 hover:bg-slate-800 text-sky-400"
+                }`}
+              >
+                Direct Email Available
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("FORM_NEEDED")}
+                className={`px-2.5 py-1 rounded-lg font-semibold text-[11px] transition-colors ${
+                  statusFilter === "FORM_NEEDED"
+                    ? "bg-purple-500 text-slate-950 shadow-sm"
+                    : "bg-slate-800/80 hover:bg-slate-800 text-purple-400"
+                }`}
+              >
+                Form / Social Needed
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3 text-slate-400 text-[11px]">
+              <span>
+                Showing <strong className="text-white">{filteredFirms.length}</strong> of {firms.length} practices
+              </span>
+              {(searchTerm || statusFilter !== "ALL" || cityFilter !== "ALL") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setStatusFilter("ALL");
+                    setCityFilter("ALL");
+                  }}
+                  className="text-amber-400 hover:underline font-semibold"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
@@ -473,10 +639,11 @@ export default function OutreachDispatcher({ firms }: OutreachDispatcherProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/80">
-              {firms.map((f) => {
-                const isSent = sentFirmIds.has(f.id);
-                const displayEmail = f.partnerEmail || f.email || "No email";
-                const isUnroutable = displayEmail.startsWith("unverified@");
+              {filteredFirms.length > 0 ? (
+                filteredFirms.map((f) => {
+                  const isSent = sentFirmIds.has(f.id);
+                  const displayEmail = f.partnerEmail || f.email || "No email";
+                  const isUnroutable = displayEmail.startsWith("unverified@");
 
                 return (
                   <tr key={f.id} className="hover:bg-slate-800/30 transition-colors">
@@ -547,7 +714,30 @@ export default function OutreachDispatcher({ firms }: OutreachDispatcherProps) {
                     </td>
                   </tr>
                 );
-              })}
+              })
+            ) : (
+              <tr>
+                <td colSpan={5} className="p-10 text-center space-y-2">
+                  <p className="text-sm font-semibold text-slate-300">
+                    No law practices or emails matched your search.
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Try typing a different firm name, attorney first name, or email domain.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setStatusFilter("ALL");
+                      setCityFilter("ALL");
+                    }}
+                    className="inline-block mt-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-xs transition-colors"
+                  >
+                    Reset Filters
+                  </button>
+                </td>
+              </tr>
+            )}
             </tbody>
           </table>
         </div>

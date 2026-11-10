@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Link from "next/link";
 import { Scale, ShieldCheck, PhoneCall, Building2 } from "lucide-react";
+import NavSearchButton from "@/components/NavSearchButton";
 
 export const metadata: Metadata = {
   title: "If You Need A Lawyer | Vetted 1-5 Attorney Small Firms in DFW (No Billboard Mills)",
@@ -49,6 +50,7 @@ export default function RootLayout({
             </nav>
 
             <div className="flex items-center gap-3">
+              <NavSearchButton />
               <Link
                 href="/#triage"
                 className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-sm transition-all shadow-md shadow-amber-500/10 hover:shadow-amber-500/25"

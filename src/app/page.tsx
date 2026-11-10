@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import LegalTriageTool from "@/components/LegalTriageTool";
+import DirectorySearch from "@/components/DirectorySearch";
 import {
   Scale,
   ShieldCheck,
@@ -139,37 +140,33 @@ export default async function HomePage() {
                 Tired of calling a TV billboard firm only to be handed to a call center or junior paralegal? We index exclusively vetted <strong>1 to 5 attorney small boutique practices</strong> across Tarrant County, plus the trusted local associated doctors, bail bondsmen, and mediators you need.
               </p>
 
-              {/* Instant Search Bar */}
-              <div className="p-4 rounded-2xl border border-slate-800 bg-slate-900/90 shadow-2xl backdrop-blur-md space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <label className="block font-semibold text-slate-400 mb-1">Select Tarrant County City</label>
-                    <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-medium flex items-center justify-between">
-                      <span>Fort Worth, TX</span>
-                      <MapPin className="w-4 h-4 text-amber-400" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-400 mb-1">Select Practice Area</label>
-                    <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-medium flex items-center justify-between">
-                      <span>Family Law & Custody</span>
-                      <Scale className="w-4 h-4 text-amber-400" />
-                    </div>
-                  </div>
-                </div>
+              {/* Instant Search Bar (Search by Firm, Email, Attorney, or City) */}
+              <div className="space-y-3">
+                <DirectorySearch
+                  variant="hero"
+                  placeholder="Search by firm name, partner name, email (e.g. ynk@, .com), city, or issue..."
+                />
 
-                <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 pt-1">
+                  <span className="font-semibold text-slate-300">Popular Quick Searches:</span>
                   <Link
                     href="/tarrant-county/fort-worth/family-law"
-                    className="w-full sm:flex-1 py-3 px-6 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
+                    className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 hover:text-amber-300 transition-colors"
                   >
-                    <span>Browse Vetted 1–5 Lawyer Firms</span>
-                    <ArrowRight className="w-4 h-4" />
+                    Fort Worth Family Law
                   </Link>
-
-                  <div className="text-[11px] text-slate-400 font-medium">
-                    Toggle: <span className="text-amber-400 font-bold">All 1–5</span> | Solo (1) | Boutique (2–5)
-                  </div>
+                  <Link
+                    href="/tarrant-county/arlington/criminal-defense-dwi"
+                    className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 hover:text-amber-300 transition-colors"
+                  >
+                    Arlington DWI Defense
+                  </Link>
+                  <Link
+                    href="/tarrant-county/southlake/probate-estate-planning"
+                    className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 hover:text-amber-300 transition-colors"
+                  >
+                    Southlake Probate
+                  </Link>
                 </div>
               </div>
 
