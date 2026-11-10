@@ -104,6 +104,12 @@ model LawFirm {
   acceptsCoCounsel    Boolean       @default(true) // TX Rule 1.04(f) joint responsibility
   hasFreeConsultation Boolean       @default(true)
 
+  // Google Business Profile & Review Data
+  googlePlaceId         String?
+  googleRating          Float?
+  googleReviewCount     Int?
+  googleReviewsSyncedAt DateTime?
+
   practiceAreas       LawFirmPracticeArea[]
   leadEvents          LeadEvent[]
   createdAt           DateTime      @default(now())
@@ -146,6 +152,11 @@ model AssociatedPro {
   tier                String        @default("FREE") // "FREE", "VERIFIED_PRO", "FEATURED_SPONSOR"
   claimToken          String        @unique @default(cuid())
   isClaimed           Boolean       @default(false)
+
+  // Google Business Profile & Review Data
+  googlePlaceId       String?
+  googleRating        Float?
+  googleReviewCount   Int?
 
   leadEvents          LeadEvent[]
   createdAt           DateTime      @default(now())

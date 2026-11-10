@@ -1,8 +1,9 @@
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import LawFirmCard from "@/components/LawFirmCard";
 import AssociatedProCard from "@/components/AssociatedProCard";
 import Link from "next/link";
-import { Scale, Users, ShieldAlert, Sparkles, MapPin, Building, ArrowLeft } from "lucide-react";
+import { Scale, Users, ShieldAlert, Sparkles, MapPin, Building, ArrowLeft, HelpCircle } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 
 interface PageProps {
@@ -14,6 +15,41 @@ interface PageProps {
   searchParams: Promise<{
     size?: string; // "all", "solo", "boutique"
   }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { county: countySlug, city: citySlug, practiceArea: paSlug } = await params;
+
+  if (countySlug === "out") {
+    return { title: "Redirecting... | IfYouNeedALawyer.com" };
+  }
+
+  const [county, city, practiceArea] = await Promise.all([
+    prisma.county.findUnique({ where: { slug: countySlug } }),
+    prisma.city.findUnique({ where: { slug: citySlug } }),
+    prisma.practiceArea.findUnique({ where: { slug: paSlug } }),
+  ]);
+
+  if (!county || !city || !practiceArea) {
+    return { title: "Directory | IfYouNeedALawyer.com" };
+  }
+
+  const title = `Best ${practiceArea.name} Lawyers in ${city.name}, TX (1–5 Attorney Firms) | IfYouNeedALawyer.com`;
+  const description = `Compare vetted 1 to 5 attorney boutique ${practiceArea.name} practices in ${city.name}, ${county.name}, Texas. Transparent fee ranges (${practiceArea.avgSoloFeeRange}), direct partner access, and zero billboard mills.`;
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: `https://ifyouneedalawyer.com/${county.slug}/${city.slug}/${practiceArea.slug}`,
+    },
+    openGraph: {
+      title,
+      description,
+      url: `https://ifyouneedalawyer.com/${county.slug}/${city.slug}/${practiceArea.slug}`,
+      type: "website",
+    },
+  };
 }
 
 export default async function CategoryDirectoryPage({ params, searchParams }: PageProps) {
@@ -109,8 +145,106 @@ export default async function CategoryDirectoryPage({ params, searchParams }: Pa
     orderBy: { tier: "desc" },
   });
 
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ifyouneedalawyer.com";
+  const pageUrl = `${baseUrl}/${county.slug}/${city.slug}/${practiceArea.slug}`;
+
+  // 1. ItemList Schema for Rich Directory Snippets
+  const itemListSchema = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: `Vetted Small Firm ${practiceArea.name} Attorneys in ${city.name}, TX`,
+    url: pageUrl,
+    numberOfItems: firms.length,
+    itemListElement: firms.map((firm, index) => {
+      const legalServiceItem: Record<string, unknown> = {
+        "@type": "LegalService",
+        name: firm.name,
+        url: `${baseUrl}/firm/${firm.slug}`,
+        telephone: firm.phone,
+        address: {
+          "@type": "PostalAddress",
+          streetAddress: firm.address,
+          addressLocality: firm.city.name,
+          addressRegion: "TX",
+          postalCode: firm.zipCode,
+          addressCountry: "US",
+        },
+      };
+
+      if (typeof firm.googleRating === "number" && typeof firm.googleReviewCount === "number" && firm.googleReviewCount > 0) {
+        legalServiceItem.aggregateRating = {
+          "@type": "AggregateRating",
+          ratingValue: firm.googleRating,
+          reviewCount: firm.googleReviewCount,
+          bestRating: 5,
+          worstRating: 1,
+        };
+      }
+
+      return {
+        "@type": "ListItem",
+        position: index + 1,
+        item: legalServiceItem,
+      };
+    }),
+  };
+
+  // 2. BreadcrumbList Schema
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: baseUrl },
+      { "@type": "ListItem", position: 2, name: county.name, item: `${baseUrl}/tarrant-county/fort-worth/${paSlug}` },
+      { "@type": "ListItem", position: 3, name: `${city.name} ${practiceArea.name}`, item: pageUrl },
+    ],
+  };
+
+  // 3. Dynamic City + Practice Area FAQs & Schema
+  const faqs = [
+    {
+      question: `How much does a ${practiceArea.name} attorney cost in ${city.name}, TX?`,
+      answer: `For vetted solo practitioners (1 lawyer) in ${city.name} and Tarrant County, typical retainers or fee structures range around ${practiceArea.avgSoloFeeRange}. For 2 to 5 attorney boutique firms, typical benchmarks are ${practiceArea.avgBoutiqueFeeRange}, often with lower overhead than large downtown billboard firms.`,
+    },
+    {
+      question: `Why choose a 1 to 5 attorney firm in ${city.name} over a large regional billboard firm?`,
+      answer: `Large TV billboard firms frequently pass cases off to call-center intake teams or junior associates. Every practice listed on IfYouNeedALawyer.com is strictly capped at 1 to 5 licensed attorneys so your ${practiceArea.name} matter in ${city.name} is handled directly by an experienced partner.`,
+    },
+    {
+      question: `Are attorneys in ${city.name} verified by the State Bar of Texas?`,
+      answer: `Yes. All listed managing partners are cross-checked against public Texas State Bar records and verified to maintain local offices serving ${city.name} and ${county.name} courts.`,
+    },
+  ];
+
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((faq) => ({
+      "@type": "Question",
+      name: faq.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: faq.answer,
+      },
+    })),
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      {/* Structured Data / JSON-LD */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
+
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-slate-400 mb-6">
         <Link href="/" className="hover:text-amber-400">Home</Link>
@@ -284,6 +418,25 @@ export default async function CategoryDirectoryPage({ params, searchParams }: Pa
               </Link>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* SEO Frequently Asked Questions Section (Matches FAQPage Schema) */}
+      <div className="mt-16 pt-10 border-t border-slate-800 space-y-6">
+        <div className="flex items-center gap-2">
+          <HelpCircle className="w-5 h-5 text-amber-400" />
+          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+            {city.name}, TX {practiceArea.name} — Common Questions & Fee Benchmarks
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {faqs.map((faq, i) => (
+            <div key={i} className="p-6 rounded-2xl border border-slate-800 bg-slate-900/40 space-y-2.5">
+              <h3 className="text-sm font-bold text-amber-400 leading-snug">{faq.question}</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">{faq.answer}</p>
+            </div>
+          ))}
         </div>
       </div>
     </div>

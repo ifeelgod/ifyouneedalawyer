@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Phone, Globe, ShieldCheck, Stethoscope, Key, HeartHandshake, Home } from "lucide-react";
+import { Phone, Globe, ShieldCheck, Stethoscope, Key, HeartHandshake, Home, Star, MapPin } from "lucide-react";
 import { formatPhoneNumber } from "@/lib/utils";
+import { getGoogleMapsPlaceUrl } from "@/lib/google-places";
 
 interface AssociatedProCardProps {
   pro: {
@@ -18,6 +19,9 @@ interface AssociatedProCardProps {
     acceptsLOP: boolean;
     is24Hours: boolean;
     tier: string;
+    googlePlaceId?: string | null;
+    googleRating?: number | null;
+    googleReviewCount?: number | null;
   };
   practiceAreaSlug: string;
 }
@@ -118,12 +122,44 @@ export default function AssociatedProCard({ pro, practiceAreaSlug }: AssociatedP
       </div>
 
       <div>
-        <h4 className="text-base font-bold text-white tracking-tight">
-          {pro.businessName}
-        </h4>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {pro.address}, {pro.city.name}, TX
-        </p>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h4 className="text-base font-bold text-white tracking-tight">
+            {pro.businessName}
+          </h4>
+          {typeof pro.googleRating === "number" && (
+            <a
+              href={getGoogleMapsPlaceUrl({
+                placeId: pro.googlePlaceId,
+                name: pro.businessName,
+                address: pro.address,
+                city: pro.city.name,
+              })}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] font-bold"
+            >
+              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+              <span>{pro.googleRating.toFixed(1)}</span>
+              {pro.googleReviewCount && (
+                <span className="text-slate-400 font-normal">({pro.googleReviewCount})</span>
+              )}
+            </a>
+          )}
+        </div>
+        <a
+          href={getGoogleMapsPlaceUrl({
+            placeId: pro.googlePlaceId,
+            name: pro.businessName,
+            address: pro.address,
+            city: pro.city.name,
+          })}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-slate-400 hover:text-amber-400 mt-1 inline-flex items-center gap-1 transition-colors"
+        >
+          <MapPin className="w-3 h-3 text-amber-400/70" />
+          <span>{pro.address}, {pro.city.name}, TX</span>
+        </a>
       </div>
 
       <p className="text-xs text-slate-300 leading-relaxed">

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Phone, Globe, ShieldCheck, CheckCircle2, MapPin, Scale, Calendar, Sparkles } from "lucide-react";
+import { Phone, Globe, ShieldCheck, CheckCircle2, MapPin, Scale, Calendar, Sparkles, Star, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { formatPhoneNumber } from "@/lib/utils";
+import { getGoogleMapsPlaceUrl } from "@/lib/google-places";
 
 interface LawFirmCardProps {
   firm: {
@@ -24,6 +25,9 @@ interface LawFirmCardProps {
     featuredRank: number | null;
     hasFreeConsultation: boolean;
     acceptsCoCounsel: boolean;
+    googlePlaceId?: string | null;
+    googleRating?: number | null;
+    googleReviewCount?: number | null;
   };
   practiceAreaSlug: string;
   citySlug: string;
@@ -153,6 +157,28 @@ export default function LawFirmCard({ firm, practiceAreaSlug, citySlug }: LawFir
               <ShieldCheck className="w-3 h-3" />
               Texas Bar Verified
             </span>
+
+            {/* Google Business Profile Star Rating Badge */}
+            {typeof firm.googleRating === "number" && (
+              <a
+                href={getGoogleMapsPlaceUrl({
+                  placeId: firm.googlePlaceId,
+                  name: firm.name,
+                  address: firm.address,
+                  city: firm.city.name,
+                })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-colors"
+                title="View Verified Google Business Profile Reviews"
+              >
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                <span>{firm.googleRating.toFixed(1)}</span>
+                {firm.googleReviewCount && (
+                  <span className="text-slate-400 font-normal">({firm.googleReviewCount} Google Reviews)</span>
+                )}
+              </a>
+            )}
           </div>
 
           {firm.tagline && (
@@ -162,10 +188,22 @@ export default function LawFirmCard({ firm, practiceAreaSlug, citySlug }: LawFir
           )}
 
           <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-slate-400 mb-3">
-            <span className="flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5 text-slate-500" />
-              {firm.address}, {firm.city.name}, TX
-            </span>
+            <a
+              href={getGoogleMapsPlaceUrl({
+                placeId: firm.googlePlaceId,
+                name: firm.name,
+                address: firm.address,
+                city: firm.city.name,
+              })}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 hover:text-amber-400 transition-colors group"
+              title="Open Firm Location on Google Maps"
+            >
+              <MapPin className="w-3.5 h-3.5 text-amber-400/80 group-hover:text-amber-400" />
+              <span>{firm.address}, {firm.city.name}, TX</span>
+              <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+            </a>
             <span>Managing Attorney: <strong className="text-slate-200">{firm.managingPartnerName}</strong></span>
             {firm.barNumber && <span>Bar #{firm.barNumber}</span>}
           </div>

@@ -104,8 +104,45 @@ export default async function HomePage() {
 
   const displayCourthouses = courthouses.length > 0 ? courthouses : fallbackCourthouses;
 
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ifyouneedalawyer.com";
+  const websiteSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "IfYouNeedALawyer.com",
+    alternateName: "Tarrant County Vetted Small Law Firm Directory",
+    url: baseUrl,
+    description:
+      "Exclusive legal directory connecting consumers in Fort Worth, Arlington & Tarrant County strictly with vetted 1 to 5 attorney boutique law firms.",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: `${baseUrl}/api/search?q={search_term_string}`,
+      },
+      "query-input": "required name=search_term_string",
+    },
+  };
+
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "IfYouNeedALawyer.com",
+    url: baseUrl,
+    areaServed: "Tarrant County, TX",
+    email: "support@ifyouneedalawyer.com",
+  };
+
   return (
     <div className="space-y-24 pb-20">
+      {/* Structured Data / JSON-LD */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+      />
       {/* 1. DUAL-ENTRY HERO SECTION */}
       <section className="relative overflow-hidden pt-12 sm:pt-20">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-amber-500/10 rounded-full blur-[140px] -z-10 pointer-events-none" />
