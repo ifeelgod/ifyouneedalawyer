@@ -112,10 +112,16 @@ export default function RootLayout({
 
             <div className="border-t border-slate-800/80 mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
               <p>© {new Date().getFullYear()} IfYouNeedALawyer.com. All rights reserved. Not a certified lawyer referral service or law firm. Attorney profiles are advertising listings.</p>
-              <div className="flex gap-6">
-                <span>Privacy Policy</span>
-                <span>Terms of Service</span>
-                <span>Texas Bar Compliance</span>
+              <div className="flex flex-wrap gap-6">
+                <Link href="/privacy" className="hover:text-amber-400 transition-colors">
+                  Privacy Policy
+                </Link>
+                <Link href="/terms" className="hover:text-amber-400 transition-colors">
+                  Terms of Service
+                </Link>
+                <Link href="/texas-bar-compliance" className="hover:text-amber-400 transition-colors">
+                  Texas Bar Compliance
+                </Link>
               </div>
             </div>
           </div>
