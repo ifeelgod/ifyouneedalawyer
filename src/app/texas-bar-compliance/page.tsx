@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Scale, ShieldCheck, CheckCircle2, AlertTriangle, ArrowLeft, BookOpen, ExternalLink } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://ifyouneedalawyer.com/texas-bar-compliance" },
   title: "Texas State Bar Compliance & Advertising Standards | IfYouNeedALawyer.com",
   description:
     "Official compliance statement regarding Texas Disciplinary Rules of Professional Conduct (TDRPC Rules 1.04, 5.04, 7.01-7.03) and the Texas Lawyer Referral Services Act.",
