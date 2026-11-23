@@ -3,6 +3,7 @@ import Link from "next/link";
 import { FileText, Scale, ShieldAlert, ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://ifyouneedalawyer.com/terms" },
   title: "Terms of Service | IfYouNeedALawyer.com",
   description:
     "Terms of use, legal disclaimers, and advertising rules governing your access to IfYouNeedALawyer.com.",
