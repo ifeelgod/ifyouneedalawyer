@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -7,6 +8,24 @@ import AssociatedProCard from "@/components/AssociatedProCard";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const courthouse = await prisma.courthouse.findUnique({
+    where: { slug },
+    include: { city: true, county: true },
+  });
+  if (!courthouse) return { title: "Courthouse Not Found | IfYouNeedALawyer.com" };
+  const title = `${courthouse.name} | IfYouNeedALawyer.com`;
+  const description = `Guide to ${courthouse.name} in ${courthouse.city?.name || courthouse.county.name}, Texas. Find courthouse information and nearby legal professionals.`;
+  const url = `https://ifyouneedalawyer.com/courthouses/${courthouse.slug}`;
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: { title, description, url, type: "website" },
+  };
 }
 
 export default async function CourthouseGuidePage({ params }: PageProps) {
