@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ShieldCheck, Lock, Eye, AlertTriangle, ArrowLeft, CheckCircle2 } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://ifyouneedalawyer.com/privacy" },
   title: "Privacy Policy | IfYouNeedALawyer.com",
   description:
     "How IfYouNeedALawyer.com collects, protects, and handles consumer inquiries and attorney directory information in accordance with Texas privacy standards.",
