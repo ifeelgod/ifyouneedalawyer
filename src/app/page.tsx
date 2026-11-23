@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import LegalTriageTool from "@/components/LegalTriageTool";
@@ -17,6 +18,10 @@ import {
   Home,
   AlertTriangle
 } from "lucide-react";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "https://ifyouneedalawyer.com/" },
+};
 
 export const dynamic = "force-dynamic";
 
@@ -432,4 +437,4 @@ export default async function HomePage() {
       </section>
     </div>
   );
-}
+            }
